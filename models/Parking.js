@@ -1,0 +1,39 @@
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
+const User = require('./User');
+
+const Parking = sequelize.define('Parking', {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
+    name: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    address: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    capacity: {
+        type: DataTypes.INTEGER,
+        allowNull: false
+    },
+    id_administrator: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        references: {
+            model: User,
+            key: 'id'
+        }
+    },
+}, {
+    tableName: 'parkings',
+    timestamps: false,
+    underscored: false
+});
+
+Parking.belongsTo(User, { foreignKey: 'id_administrator', as: 'administrator' });
+
+module.exports = Parking;
