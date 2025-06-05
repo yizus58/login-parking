@@ -1,7 +1,5 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
-const User = require('./User');
-const Parking = require('./Parking');
 
 const Vehicle = sequelize.define('Vehicle', {
     id: {
@@ -22,11 +20,11 @@ const Vehicle = sequelize.define('Vehicle', {
         type: DataTypes.DATE,
         allowNull: true
     },
-    id_parking:{
+    id_parking: {
         type: DataTypes.INTEGER,
         allowNull: false,
         references: {
-            model: Parking,
+            model: 'parkings',
             key: 'id'
         }
     },
@@ -34,7 +32,7 @@ const Vehicle = sequelize.define('Vehicle', {
         type: DataTypes.INTEGER,
         allowNull: false,
         references: {
-            model: User,
+            model: 'users',
             key: 'id'
         }
     },
@@ -45,9 +43,7 @@ const Vehicle = sequelize.define('Vehicle', {
     },
 }, {
     tableName: 'vehicles',
-    timestamps: false,
-    underscored: false
+    timestamps: false
 });
 
-Vehicle.belongsTo(Parking, { foreignKey: 'id_parking', as: 'parking' });
-Vehicle.belongsTo(User, { foreignKey: 'id_admin', as: 'admin' });
+module.exports = Vehicle;

@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { connectToDatabase } = require('../config/database');
+require('../models/associations');
 
 class Server {
     constructor() {

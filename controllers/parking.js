@@ -4,11 +4,13 @@ const { validateUserRole, userRoleResponse} = require('../utils/validation');
 const logger = require('../utils/logger');
 const Parking = require('../models/Parking');
 const User = require('../models/User');
+const Vehicle = require('../models/Vehicle');
 const idAdmin = Number(process.env.ID_ADMIN);
 
 const createParking = async (req, res = response) => {
-    const {name, address, capacity, cost_per_hour, id_partner} = req.body;
+    const {name, address, capacity, cost, id_partner} = req.body;
     const uid = req.uid;
+    const cost_per_hour = parseFloat(cost);
 
     try {
         const validateUser = await validateUserRole(uid);
@@ -94,9 +96,15 @@ const getAllParkings = async (req, res = response) => {
                 attributes: ['id', 'username', 'email']
             }]
         });
+
+        const parkingsWithoutIdPartner = parkings.map(parking => {
+            const { id_partner, ...rest } = parking.toJSON();
+            return rest;
+        });
+
         res.status(200).json({
             ok: true,
-            parkings
+            parkings: parkingsWithoutIdPartner
         });
     } catch (error) {
         logger.error(error);
@@ -108,7 +116,7 @@ const getAllParkings = async (req, res = response) => {
 }
 
 const getParkingById = async (req, res = response) => {
-    const {id_parking} = req.params;
+    const {id_parking} = req.body;
     const uid = req.uid;
 
     try {
@@ -117,22 +125,106 @@ const getParkingById = async (req, res = response) => {
             return userRoleResponse(validateUser, res);
         }
 
-        const parking = await Parking.findByPk(id_parking, {
+        const parking = await Parking.findAll({
+            where: { id : id_parking },
             include: [{
-                model: User,
-                as: 'partner',
-                attributes: ['id', 'username', 'email']
+                model: Vehicle,
+                as: 'vehicles',
+                attributes: ['id', 'plate_number', 'entry_time', 'exit_time', 'status'],
             }]
         });
+
         if (!parking) {
             return res.status(404).json({
                 ok: false,
                 msg: 'Parking no encontrado'
             });
         }
+
+        const parkingsWithoutIdPartner = parking.map(parking => {
+            const { id_partner, ...rest } = parking.toJSON();
+            return rest;
+        });
+
         res.status(200).json({
             ok: true,
-            parking
+            parking: parkingsWithoutIdPartner
+        });
+    } catch (error) {
+        logger.error(error);
+        return res.status(500).json({
+            ok: false,
+            msg: 'Oops, a ocurrido un error, por favor comuniquese con el equipo de soporte'
+        });
+    }
+}
+
+const getParkingByUser = async (req, res = response) => {
+    const uid = req.uid;
+
+    try {
+        const validateUser = await validateUserRole(uid);
+        if (validateUser === idAdmin) {
+            return userRoleResponse(validateUser, res);
+        }
+
+        const parkings = await Parking.findAll({
+            where: { id_partner: uid },
+        });
+
+        if (parkings.length === 0) {
+            return res.status(404).json({
+                ok: false,
+                msg: 'No se encontraron parkings para este usuario'
+            });
+        }
+
+        const parkingsWithoutIdPartner = parkings.map(parking => {
+            const { id_partner, ...rest } = parking.toJSON();
+            return rest;
+        });
+
+        res.status(200).json({
+            ok: true,
+            parkings: parkingsWithoutIdPartner
+        });
+    } catch (error) {
+        logger.error(error);
+        return res.status(500).json({
+            ok: false,
+            msg: 'Oops, a ocurrido un error, por favor comuniquese con el equipo de soporte'
+        });
+    }
+}
+
+const getDetailsAllParking = async (req, res = response) => {
+    const uid = req.uid;
+
+    try {
+        const validateUser = await validateUserRole(uid);
+        if (validateUser === idAdmin) {
+            return userRoleResponse(validateUser, res);
+        }
+
+        const parkings = await Parking.findAll({
+            where: { id_partner: uid },
+            include: [{
+                model: Vehicle,
+                as: 'vehicles',
+                attributes: ['id', 'plate_number', 'entry_time', 'exit_time', 'status'],
+            }]
+        });
+
+        if (!parkings) {
+            return res.status(404).json({
+                ok: false,
+                msg: 'Parking no encontrado'
+            });
+        }
+
+        res.status(200).json({
+            ok: true,
+            parkings
         });
     } catch (error) {
         logger.error(error);
@@ -179,6 +271,7 @@ const removeParking = async (req, res = response) => {
 module.exports = {
     getAllParkings,
     getParkingById,
+    getParkingByUser,
     createParking,
     updateParking,
     removeParking

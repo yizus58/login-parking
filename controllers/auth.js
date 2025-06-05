@@ -150,7 +150,7 @@ const getAllUsers = async (req, res = response) => {
 
         res.json({
             ok: true,
-            usersFilter
+            users: usersFilter
         });
     } catch (error) {
         logger.error(error);

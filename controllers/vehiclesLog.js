@@ -39,7 +39,6 @@ const EntryVehicle = async (req, res = response) => {
         }
 
         const entryTime = new Date();
-        console.log("Entry Time:", entryTime);
         const vehicleEntry = {
             id_parking,
             vehicle_plate,
@@ -57,7 +56,7 @@ const EntryVehicle = async (req, res = response) => {
         logger.error(error);
         return res.status(500).json({
             ok: false,
-            msg: 'An error occurred, please contact support'
+            msg: 'Oops, a ocurrido un error, por favor comuniquese con el equipo de soporte'
         });
     }
 }
@@ -76,7 +75,7 @@ const ExitVehicle = async (req, res = response) => {
         if (!parking) {
             return res.status(404).json({
                 ok: false,
-                msg: 'Parking not found'
+                msg: 'Parking no encontrado'
             });
         }
 
@@ -90,28 +89,37 @@ const ExitVehicle = async (req, res = response) => {
         if (!vehicleEntry) {
             return res.status(404).json({
                 ok: false,
-                msg: '"No se puede Registrar Salida, no existe la placa en el parqueadero'
+                msg: 'No se puede Registrar Salida, no existe la placa en el parqueadero'
             });
         }
 
         const exitTime = new Date();
-        console.log("Exit Time:", exitTime);
+
+        const costParking = parking.cost_per_hour;
+
+        const entryTime = new Date(vehicleEntry.entry_time);
+        const timeDifference = Math.abs(exitTime - entryTime);
+        const minutesParked = Math.ceil(timeDifference / (1000 * 60));
+
+        const totalCost = Math.ceil(minutesParked / 60) * costParking;
 
         vehicleEntry.exit_time = exitTime;
         await vehicleEntry.update(
             { exit_time: exitTime, status: 'OUT' },
             { where: { id_parking, vehicle_plate } }
         );
+        vehicleEntry.total_cost = totalCost;
 
         res.status(200).json({
             ok: true,
-            vehicleEntry
+            vehicleEntry,
+            msg: 'Salida registrada',
         });
     } catch (error) {
         logger.error(error);
         return res.status(500).json({
             ok: false,
-            msg: 'An error occurred, please contact support'
+            msg: 'Oops, a ocurrido un error, por favor comuniquese con el equipo de soporte'
         });
     }
 }
