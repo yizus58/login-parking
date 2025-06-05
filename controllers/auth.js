@@ -1,9 +1,11 @@
 require('dotenv').config();
 const { generateJWT } = require('../helpers/jwt');
 const { response } = require('express');
-const { validateUserRole, validateExistingUser, validateUserByEmailExists, validatePassword } = require('./validation');
+const { validateUserRole, validateExistingUser, validateUserByEmailExists, validatePassword, userRoleResponse} = require('../utils/validation');
 const bcrypt = require('bcryptjs');
+const logger = require('../utils/logger');
 const User = require('../models/user');
+const idAdmin = Number(process.env.ID_ADMIN);
 
 User.sequelize.sync().then(async () => {
     const adminEmail = process.env.ADMIN_EMAIL;
@@ -25,12 +27,15 @@ User.sequelize.sync().then(async () => {
 
 
 const createUser = async (req, res = response) => {
-    const { email, password, username } = req.body;
+    const {email, password, username} = req.body;
 
     const uid = req.uid;
 
     try {
-        await validateUserRole(uid);
+        const validateUser = await validateUserRole(uid);
+        if (validateUser !== idAdmin) {
+            return userRoleResponse(validateUser, res);
+        }
 
         await validateExistingUser(email, username);
 
@@ -45,9 +50,8 @@ const createUser = async (req, res = response) => {
             ok: true,
             user
         });
-
     } catch (error) {
-        console.log(error);
+        logger.error(error);
         return res.status(500).json({
             ok: false,
             msg: 'Oops, a ocurrido un error, por favor comuniquese con el equipo de soporte'
@@ -84,7 +88,7 @@ const login = async (req, res = response) => {
         });
 
     } catch (error) {
-        console.log(error);
+        logger.error(error);
         res.status(500).json({
             ok: false,
             msg: 'Oops, a ocurrido un error, por favor comuniquese con el equipo de soporte'
@@ -117,7 +121,7 @@ const clearTable = async (req, res = response) => {
             msg: 'Tabla limpiada correctamente'
         });
     } catch (error) {
-        console.log(error);
+        logger.error(error);
         res.status(500).json({
             ok: false,
             msg: 'Oops, a ocurrido un error, por favor comuniquese con el equipo de soporte'
@@ -129,7 +133,10 @@ const getAllUsers = async (req, res = response) => {
     try {
         const uid = req.uid;
 
-        await validateUserRole(uid);
+        const validateUser = await validateUserRole(uid);
+        if (validateUser !== idAdmin) {
+            return userRoleResponse(validateUser, res);
+        }
 
         const users = await User.findAll();
 
@@ -143,10 +150,10 @@ const getAllUsers = async (req, res = response) => {
 
         res.json({
             ok: true,
-            users
+            usersFilter
         });
     } catch (error) {
-        console.log(error);
+        logger.error(error);
         res.status(500).json({
             ok: false,
             msg: 'Oops, a ocurrido un error, por favor comuniquese con el equipo de soporte'
@@ -171,7 +178,7 @@ const listTables = async (req, res = response) => {
             tables: tables[0]
         });
     } catch (error) {
-        console.log(error);
+        logger.error(error);
         res.status(500).json({
             ok: false,
             msg: 'Oops, a ocurrido un error, por favor comuniquese con el equipo de soporte'

@@ -20,7 +20,11 @@ const Parking = sequelize.define('Parking', {
         type: DataTypes.INTEGER,
         allowNull: false
     },
-    id_administrator: {
+    cost_per_hour: {
+        type: DataTypes.FLOAT,
+        allowNull: false
+    },
+    id_partner: {
         type: DataTypes.INTEGER,
         allowNull: false,
         references: {
@@ -34,6 +38,6 @@ const Parking = sequelize.define('Parking', {
     underscored: false
 });
 
-Parking.belongsTo(User, { foreignKey: 'id_administrator', as: 'administrator' });
+Parking.belongsTo(User, { foreignKey: 'id_partner', as: 'partner' });
 
 module.exports = Parking;
