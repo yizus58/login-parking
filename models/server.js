@@ -11,6 +11,7 @@ class Server {
         this.parkingPath = '/api/parking';
         this.usersPath = '/api/users';
         this.vehiclesPath = '/api/vehicles';
+        this.emailPath = '/api/emails';
 
         this.middlewares();
         this.routes();
@@ -26,6 +27,7 @@ class Server {
         this.app.use(this.parkingPath, require('../routes/parkingRoutes'));
         this.app.use(this.usersPath, require('../routes/authRoutes'));
         this.app.use(this.vehiclesPath, require('../routes/vehicleRoutes'));
+        this.app.use(this.emailPath, require('../routes/emailRoutes'));
     }
 
     async start() {

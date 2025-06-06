@@ -1,12 +1,12 @@
 require('dotenv').config();
+const {Op} = require("sequelize");
 const { response } = require('express');
 const { validateUserRole, validateVehiclePlate, responseError, userRoleResponse } = require('../utils/validation');
+const db = require('../config/database');
 const logger = require('../utils/logger');
 const Parking = require('../models/Parking');
 const User = require('../models/User');
 const Vehicle = require('../models/Vehicle');
-const {Op} = require("sequelize");
-const db = require('../config/database');
 const idAdmin = Number(process.env.ID_ADMIN);
 const idError = 3;
 
