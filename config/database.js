@@ -13,6 +13,18 @@ function createConnSequelize(dbName) {
             port: process.env.DB_PORT,
             dialect: "postgres",
             logging: false,
+            define: {
+                timestamps: false,
+                createdAt: false,
+                updatedAt: false,
+                deletedAt: false,
+                charset: 'utf8',
+                collate: 'utf8_general_ci',
+            },
+            dialectOptions: {
+                useUTC: false,
+            },
+            timezone: '-05:00'
         }
     );
 }

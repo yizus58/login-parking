@@ -48,7 +48,7 @@ const createUser = async (req, res = response) => {
 
         res.status(201).json({
             ok: true,
-            user
+            data: user
         });
     } catch (error) {
         logger.error(error);
@@ -83,7 +83,7 @@ const login = async (req, res = response) => {
 
         res.json({
             ok: true,
-            user,
+            data: user,
             token
         });
 
@@ -105,28 +105,9 @@ const renewToken = async (req, res = response) => {
 
     res.json({
         ok: true,
-        user,
+        data: user,
         token
     });
-}
-
-const clearTable = async (req, res = response) => {
-    try {
-        await User.destroy({
-            where: {},
-            truncate: true
-        });
-        res.json({
-            ok: true,
-            msg: 'Tabla limpiada correctamente'
-        });
-    } catch (error) {
-        logger.error(error);
-        res.status(500).json({
-            ok: false,
-            msg: 'Oops, a ocurrido un error, por favor comuniquese con el equipo de soporte'
-        });
-    }
 }
 
 const getAllUsers = async (req, res = response) => {
@@ -150,7 +131,7 @@ const getAllUsers = async (req, res = response) => {
 
         res.json({
             ok: true,
-            users: usersFilter
+            data: usersFilter
         });
     } catch (error) {
         logger.error(error);
@@ -175,7 +156,7 @@ const listTables = async (req, res = response) => {
 
         res.json({
             ok: true,
-            tables: tables[0]
+            data: tables[0]
         });
     } catch (error) {
         logger.error(error);
@@ -190,7 +171,6 @@ module.exports = {
     createUser,
     login,
     renewToken,
-    clearTable,
     getAllUsers,
     listTables
 }

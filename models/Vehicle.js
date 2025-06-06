@@ -9,8 +9,11 @@ const Vehicle = sequelize.define('Vehicle', {
     },
     plate_number: {
         type: DataTypes.STRING,
-        allowNull: false,
-        unique: true
+        allowNull: false
+    },
+    model_vehicle: {
+        type: DataTypes.STRING,
+        allowNull: false
     },
     entry_time: {
         type: DataTypes.DATE,

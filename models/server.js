@@ -8,8 +8,9 @@ class Server {
     constructor() {
         this.app = express();
         this.port = process.env.PORT;
-        this.usuariosPath = '/api/usuarios';
         this.parkingPath = '/api/parking';
+        this.usersPath = '/api/users';
+        this.vehiclesPath = '/api/vehicles';
 
         this.middlewares();
         this.routes();
@@ -22,8 +23,9 @@ class Server {
     }
 
     routes() {
-        this.app.use(this.usuariosPath, require('../routes/authRoutes'));
         this.app.use(this.parkingPath, require('../routes/parkingRoutes'));
+        this.app.use(this.usersPath, require('../routes/authRoutes'));
+        this.app.use(this.vehiclesPath, require('../routes/vehicleRoutes'));
     }
 
     async start() {

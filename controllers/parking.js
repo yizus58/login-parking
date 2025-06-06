@@ -33,7 +33,7 @@ const createParking = async (req, res = response) => {
         await parking.save();
         res.status(201).json({
             ok: true,
-            parking
+            data: parking
         });
     } catch (error) {
         logger.error(error);
@@ -58,7 +58,7 @@ const updateParking = async (req, res = response) => {
         if (!parking) {
             return res.status(404).json({
                 ok: false,
-                msg: 'Parking no encontrado'
+                msg: 'Parqueadero no encontrado'
             });
         }
 
@@ -68,7 +68,7 @@ const updateParking = async (req, res = response) => {
         );
         res.status(200).json({
             ok: true,
-            msg: 'Parking actualizado correctamente'
+            msg: 'Parqueadero actualizado correctamente'
         });
 
     } catch (error) {
@@ -90,21 +90,28 @@ const getAllParkings = async (req, res = response) => {
         }
 
         const parkings = await Parking.findAll({
-            include: [{
-                model: User,
-                as: 'partner',
-                attributes: ['id', 'username', 'email']
-            }]
+            include: [
+                {
+                    model: User,
+                    as: 'partner',
+                    attributes: ['id', 'username', 'email']
+                },
+                {
+                    model: Vehicle,
+                    as: 'vehicles',
+                    attributes: ['id', 'plate_number', 'model_vehicle', 'entry_time', 'exit_time', 'status']
+                }
+            ]
         });
 
-        const parkingsWithoutIdPartner = parkings.map(parking => {
-            const { id_partner, ...rest } = parking.toJSON();
+        const parkingsWithoutIds = parkings.map(parking => {
+            const { id_partner, id_admin, id_parking, ...rest } = parking.toJSON();
             return rest;
         });
 
         res.status(200).json({
             ok: true,
-            parkings: parkingsWithoutIdPartner
+            data: parkingsWithoutIds
         });
     } catch (error) {
         logger.error(error);
@@ -116,7 +123,7 @@ const getAllParkings = async (req, res = response) => {
 }
 
 const getParkingById = async (req, res = response) => {
-    const {id_parking} = req.body;
+    const { id_parking } = req.body;
     const uid = req.uid;
 
     try {
@@ -127,28 +134,35 @@ const getParkingById = async (req, res = response) => {
 
         const parking = await Parking.findAll({
             where: { id : id_parking },
-            include: [{
-                model: Vehicle,
-                as: 'vehicles',
-                attributes: ['id', 'plate_number', 'entry_time', 'exit_time', 'status'],
-            }]
+            include: [
+                {
+                    model: User,
+                    as: 'partner',
+                    attributes: ['id', 'username', 'email']
+                },
+                {
+                    model: Vehicle,
+                    as: 'vehicles',
+                    attributes: ['id', 'plate_number', 'model_vehicle', 'entry_time', 'exit_time', 'status']
+                }
+            ]
         });
 
         if (!parking) {
             return res.status(404).json({
                 ok: false,
-                msg: 'Parking no encontrado'
+                msg: 'Parqueadero no encontrado'
             });
         }
 
-        const parkingsWithoutIdPartner = parking.map(parking => {
-            const { id_partner, ...rest } = parking.toJSON();
+        const parkingsWithoutIds = parking.map(parking => {
+            const { id_partner, id_admin, id_parking, ...rest } = parking.toJSON();
             return rest;
         });
 
         res.status(200).json({
             ok: true,
-            parking: parkingsWithoutIdPartner
+            data: parkingsWithoutIds
         });
     } catch (error) {
         logger.error(error);
@@ -179,14 +193,14 @@ const getParkingByUser = async (req, res = response) => {
             });
         }
 
-        const parkingsWithoutIdPartner = parkings.map(parking => {
+        const parkingsWithoutIds = parkings.map(parking => {
             const { id_partner, ...rest } = parking.toJSON();
             return rest;
         });
 
         res.status(200).json({
             ok: true,
-            parkings: parkingsWithoutIdPartner
+            data: parkingsWithoutIds
         });
     } catch (error) {
         logger.error(error);
@@ -197,7 +211,8 @@ const getParkingByUser = async (req, res = response) => {
     }
 }
 
-const getDetailsAllParking = async (req, res = response) => {
+const getDetailParking = async (req, res = response) => {
+    const { id_parking } = req.body;
     const uid = req.uid;
 
     try {
@@ -207,24 +222,29 @@ const getDetailsAllParking = async (req, res = response) => {
         }
 
         const parkings = await Parking.findAll({
-            where: { id_partner: uid },
+            where: { id_partner: uid, id: id_parking },
             include: [{
                 model: Vehicle,
                 as: 'vehicles',
-                attributes: ['id', 'plate_number', 'entry_time', 'exit_time', 'status'],
+                attributes: ['id', 'plate_number', 'model_vehicle', 'entry_time', 'exit_time', 'status'],
             }]
         });
 
         if (!parkings) {
             return res.status(404).json({
                 ok: false,
-                msg: 'Parking no encontrado'
+                msg: 'Parqueadero no encontrado'
             });
         }
 
+        const parkingsWithoutIds = parkings.map(parking => {
+            const { id_partner, id_admin, id_parking, ...rest } = parking.toJSON();
+            return rest;
+        });
+
         res.status(200).json({
             ok: true,
-            parkings
+            data: parkingsWithoutIds
         });
     } catch (error) {
         logger.error(error);
@@ -249,14 +269,14 @@ const removeParking = async (req, res = response) => {
         if (!parking) {
             return res.status(404).json({
                 ok: false,
-                msg: 'Parking no encontrado'
+                msg: 'Parqueadero no encontrado'
             });
         }
 
         await Parking.destroy({where: {id: id_parking}});
         res.status(200).json({
             ok: true,
-            msg: 'Parking eliminado correctamente'
+            msg: 'Parqueadero eliminado correctamente'
         });
 
     } catch (error) {
@@ -272,6 +292,7 @@ module.exports = {
     getAllParkings,
     getParkingById,
     getParkingByUser,
+    getDetailParking,
     createParking,
     updateParking,
     removeParking
