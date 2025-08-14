@@ -47,7 +47,6 @@ const sendEmail = async ({ email, text, vehicle_plate, parking_name }) => {
 
 const sendEmailVehiclesOutToday = async ({ email, name_partner, name_parking, total_vehicles, total_earnings }) => {
     try {
-        console.log("EMAIL ",email);
         if (!email) {
             return { result: false, message: "El campo email no puede estar vacío" };
         }
@@ -57,12 +56,6 @@ const sendEmailVehiclesOutToday = async ({ email, name_partner, name_parking, to
         }
 
         const transporter = createTransporter();
-
-        let htmlContent = `<p>Hola ${name_partner}, hoy ha habido un total de 
-                                ${total_vehicles} vehículos en ${name_parking}. 
-                                El total de ingresos fue de $${total_earnings}.</p><br>`;
-
-        htmlContent += `<p>Si necesitas más información, no dudes contactar con el equipo de soporte del sistema.</p>`;
 
         let subject = "Reporte de vehículos salientes hoy";
         let replyTo = process.env.ADMIN_EMAIL;

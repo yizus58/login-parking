@@ -3,7 +3,7 @@ const logger = require('../utils/logger');
 const { sendEmail, sendMultipleEmails, sendEmailVehiclesOutToday } = require('../services/emailService');
 const { VehiclesOutParking } = require("../controllers/vehiclesLog");
 const Vehicle = require('../models/Vehicle');
-const axios = require('axios');
+const {sendPost} = require("../config/http");
 
 const sendEmailToPartner = async (req, res) => {
     try {
@@ -58,8 +58,6 @@ const sendEmailToPartner = async (req, res) => {
 const sendEmailToTest = async (req, res) => {
     try {
         const dataVehicleOutParking = await VehiclesOutParking();
-        console.log('Data:', dataVehicleOutParking);
-
 
         if (Object.values(dataVehicleOutParking).length === 0) {
             return res.status(404).json({
@@ -69,13 +67,28 @@ const sendEmailToTest = async (req, res) => {
         }
 
         for (const vehicle of Object.values(dataVehicleOutParking)) {
-            await sendEmailVehiclesOutToday({
-                email: vehicle.email_partner,
-                name_partner: vehicle.name_partner,
-                name_parking: vehicle.name,
-                total_vehicles: vehicle.vehicle_count,
-                total_earnings: vehicle.total_earnings,
-            });
+            const email = vehicle.email_partner;
+            let htmlContent = `<p>Hola ${vehicle.name_partner}, hoy ha habido un total de 
+                                ${vehicle.vehicle_count} vehículos en ${vehicle.name}. 
+                                El total de ingresos fue de $${vehicle.total_earnings}.</p><br>`;
+
+            htmlContent += `<p>Si necesitas más información, no dudes en contactar al equipo de soporte del sistema.</p><br>`;
+
+            htmlContent += `<p>Este es un mensaje automático, no responda a este correo.</p>`;
+
+            htmlContent += `<style> body {font-family: Arial, sans-serif;} p {color: #333; font-size: 19px;} 
+                        </style>`;
+
+            const send = await sendPost({recipient: email, html: htmlContent, subject: process.env.APP_SUBJECT});
+
+            if (!send.result) {
+                logger.error('Error al enviar correo a socio:', { email, error: send.message });
+                return res.status(500).json({
+                    result: false,
+                    message: 'Error al enviar correo',
+                    error: send.message
+                })
+            }
         }
 
         return res.status(200).json({ result: true, message: 'Emails sent successfully' });
@@ -145,27 +158,6 @@ const sendEmailToAllPartners = async (req, res) => {
             message: 'Error al enviar correos',
             error: error.message
         });
-    }
-};
-
-//Ejemplo de axios
-const sendPost = async () => {
-    try {
-        const response = await axios.post('localhost:3001/mail/send', {
-            nombre: 'Juan',
-            email: 'juan@ejemplo.com',
-            edad: 25
-        }, {
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-
-        console.log('Respuesta:', response.data);
-        return response.data;
-    } catch (error) {
-        console.error('Error en la petición:', error.response?.data || error.message);
-        throw error;
     }
 };
 

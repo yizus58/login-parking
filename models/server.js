@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const { connectToDatabase } = require('../config/database');
 require('../models/associations');
+const initCronJobs = require("../config/cron");
 
 class Server {
     constructor() {
@@ -48,6 +49,7 @@ class Server {
             this.app.listen(this.port, () => {
                 console.log(`Server is running on port ${this.port}`);
             });
+            initCronJobs();
         } catch (err) {
             console.error('Error al sincronizar la base de datos:', err);
         }

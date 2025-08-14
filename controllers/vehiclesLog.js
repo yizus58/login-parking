@@ -504,7 +504,8 @@ const getVehiclesOut = async () => {
         const timeDifference = Math.abs(exitTime - entryTime);
         const minutesParked = Math.floor(timeDifference / (1000 * 60));
 
-        const totalCost = Math.ceil((minutesParked / 60) * costPerHour);
+        const hoursParked = Math.ceil(minutesParked / 60);
+        const totalCost = hoursParked * costPerHour;
 
         if (!parkingEarnings[parkingId]) {
             parkingEarnings[parkingId] = {

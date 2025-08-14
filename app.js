@@ -7,4 +7,4 @@ async function startApp() {
     server.start();
 }
 
-startApp();
+startApp().catch(console.error);
