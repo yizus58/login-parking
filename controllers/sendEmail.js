@@ -18,7 +18,7 @@ const sendEmailToPartner = async (req, res) => {
 
         if (!partner) {
             return res.status(404).json({
-                success: false,
+                result: false,
                 message: 'Socio no encontrado'
             });
         }
@@ -48,7 +48,7 @@ const sendEmailToPartner = async (req, res) => {
     } catch (error) {
         logger.error('Error al enviar correo a socio:', error);
         return res.status(500).json({
-            success: false,
+            result: false,
             message: 'Error al enviar correo',
             error: error.message
         });
@@ -60,6 +60,14 @@ const sendEmailToTest = async (req, res) => {
         const dataVehicleOutParking = await VehiclesOutParking();
         console.log('Data:', dataVehicleOutParking);
 
+
+        if (Object.values(dataVehicleOutParking).length === 0) {
+            return res.status(404).json({
+                result: false,
+                message: 'No hay vehículos que salieron del parqueadero hoy'
+            });
+        }
+
         for (const vehicle of Object.values(dataVehicleOutParking)) {
             await sendEmailVehiclesOutToday({
                 email: vehicle.email_partner,
@@ -70,12 +78,12 @@ const sendEmailToTest = async (req, res) => {
             });
         }
 
-        return res.status(200).json({ success: true, message: 'Emails sent successfully' });
+        return res.status(200).json({ result: true, message: 'Emails sent successfully' });
 
     } catch (error) {
         logger.error('Error al enviar correo a socio:', error);
         return res.status(500).json({
-            success: false,
+            result: false,
             message: 'Error al enviar correos',
             error: error.message
         });
@@ -88,7 +96,7 @@ const sendEmailToAllPartners = async (req, res) => {
 
         if (!text) {
             return res.status(400).json({
-                success: false,
+                result: false,
                 message: 'El mensaje es requerido'
             });
         }
@@ -101,7 +109,7 @@ const sendEmailToAllPartners = async (req, res) => {
 
         if (partners.length === 0) {
             return res.status(404).json({
-                success: false,
+                result: false,
                 message: 'No se encontraron socios en el sistema'
             });
         }
@@ -133,7 +141,7 @@ const sendEmailToAllPartners = async (req, res) => {
     } catch (error) {
         logger.error('Error al enviar correos a todos los socios:', error);
         return res.status(500).json({
-            success: false,
+            result: false,
             message: 'Error al enviar correos',
             error: error.message
         });

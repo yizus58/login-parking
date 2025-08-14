@@ -14,16 +14,15 @@ const getCurrentWeekDates = () => {
     const currentTime = new Date();
     const now = new Date(currentTime.getTime() - (currentTime.getTimezoneOffset() * 60000));
 
-
     const dayOfWeek = now.getDay();
     const startOfWeek = new Date(now);
 
     startOfWeek.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-    startOfWeek.setHours(0, 0, 0, 0);
+    startOfWeek.setHours(-5, 0, 0, 0);
 
     const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6);
-    endOfWeek.setHours(23, 59, 59, 999);
+    endOfWeek.setDate(startOfWeek.getDate() + 7);
+    endOfWeek.setHours(18, 59, 59, 999);
 
     return { startOfWeek, endOfWeek };
 };
@@ -88,13 +87,15 @@ const EntryVehicle = async (req, res = response) => {
         if (validateNewCapacity) return validateNewCapacity;
 
         const currentTime = new Date();
-        const entryTime = new Date(currentTime.getTime() - (5 * 60 * 60 * 1000));
 
         const vehicleEntry = new Vehicle(
-            { id_parking, plate_number: vehicle_plate, model_vehicle, entry_time: entryTime, cost_per_hour: cost, id_admin: uid }
+            { id_parking, plate_number: vehicle_plate, model_vehicle, entry_time: currentTime, cost_per_hour: cost, id_admin: uid }
         );
 
         await vehicleEntry.save();
+
+        vehicleEntry.entry_time = new Date(currentTime.getTime() - (5 * 60 * 60 * 1000));
+        console.log(vehicleEntry.entry_time);
 
         res.status(201).json({
             result: true,
@@ -157,7 +158,8 @@ const ExitVehicle = async (req, res = response) => {
 
         const costParking = vehicleEntry.cost_per_hour;
 
-        const entryTime = new Date(vehicleEntry.entry_time);
+        const entryTime = new Date(vehicleEntry.entry_time.getTime() - (5 * 60 * 60 * 1000));
+
         const timeDifference = Math.abs(exitTime - entryTime);
         const minutesParked = Math.floor(timeDifference / (1000 * 60));
 
@@ -165,13 +167,14 @@ const ExitVehicle = async (req, res = response) => {
 
         vehicleEntry.exit_time = exitTime;
         await Vehicle.update(
-            { exit_time: exitTime, status: 'OUT' },
+            { exit_time: currentTime, status: 'OUT' },
             { where: { id_parking, plate_number: vehicle_plate } }
         );
 
         const { id_admin, ...vehicleWithOutIds } = vehicleEntry.toJSON();
         delete vehicleWithOutIds.id_parking;
 
+        vehicleWithOutIds.entry_time = entryTime;
         vehicleWithOutIds.total_cost = totalCost;
 
         res.status(200).json({
@@ -217,7 +220,7 @@ const getTopVehicles = async (req, res = response) => {
 
         res.status(200).json({
             result: true,
-            topVehiclesWithoutIds
+            data: topVehiclesWithoutIds
         });
     } catch (error) {
         logger.error(error);
@@ -256,7 +259,7 @@ const getFirstTimeParkedVehicles = async (req, res = response) => {
         res.status(200).json({
             result: true,
             total: firstTimeVehiclesWithoutIds.length,
-            firstTimeVehiclesWithoutIds
+            data: firstTimeVehiclesWithoutIds
         });
 
     } catch (error) {
@@ -458,8 +461,7 @@ const isValidDate = (dateString) => {
 
 const parseDateString = (dateString) => {
     const [day, month, year] = dateString.split('-').map(num => parseInt(num, 10));
-    const date = new Date(year, month - 1, day);
-    return date;
+    return new Date(year, month - 1, day);
 };
 
 const getVehiclesOut = async () => {
@@ -601,6 +603,9 @@ const getTopPartnersCurrentWeek = async (req, res = response) => {
             limit: 3,
             raw: true
         });
+
+        console.log("Start of week", startOfWeek);
+        console.log("End of week", endOfWeek);
 
         res.status(200).json({
             result: true,

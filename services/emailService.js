@@ -17,7 +17,7 @@ const sendEmail = async ({ email, text, vehicle_plate, parking_name }) => {
     try {
         if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
             console.log("Correo simulado no enviado, por favor verifica las credenciales");
-            return { success: true, message: "Correo simulado enviado" };
+            return { result: true, message: "Correo simulado enviado" };
         }
 
         const transporter = createTransporter();
@@ -38,10 +38,10 @@ const sendEmail = async ({ email, text, vehicle_plate, parking_name }) => {
             replyTo: process.env.ADMIN_EMAIL,
         });
 
-        return { success: true, message: "Correo enviado correctamente", messageId: info.messageId };
+        return { result: true, message: "Correo enviado correctamente", messageId: info.messageId };
     } catch (error) {
         logger.error("Error al enviar correo:", error);
-        return { success: false, message: "Error al enviar correo", error: error.message };
+        return { result: false, message: "Error al enviar correo", error: error.message };
     }
 };
 
@@ -49,11 +49,11 @@ const sendEmailVehiclesOutToday = async ({ email, name_partner, name_parking, to
     try {
         console.log("EMAIL ",email);
         if (!email) {
-            return { success: false, message: "El campo email no puede estar vacío" };
+            return { result: false, message: "El campo email no puede estar vacío" };
         }
 
         if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-            return { success: false, message: "Correo simulado no enviado, por favor verifica las credenciales" };
+            return { result: false, message: "Correo simulado no enviado, por favor verifica las credenciales" };
         }
 
         const transporter = createTransporter();
@@ -75,10 +75,10 @@ const sendEmailVehiclesOutToday = async ({ email, name_partner, name_parking, to
             html: htmlContent,
             replyTo: replyTo,
         });
-        return { success: true, message: "Correo enviado correctamente", messageId: info.messageId };
+        return { result: true, message: "Correo enviado correctamente", messageId: info.messageId };
     } catch (error) {
         logger.error("Error al enviar correo vehículos salientes hoy:", error);
-        return { success: false, message: "Error al enviar correo vehículos salientes hoy", error: error.message };
+        return { result: false, message: "Error al enviar correo vehículos salientes hoy", error: error.message };
     }
 };
 
@@ -87,7 +87,7 @@ const sendMultipleEmails = async ({ emails, text, vehicle_plate, parking_name })
         const results = [];
 
         if (!Array.isArray(emails)) {
-            return { success: false, message: "El campo emails debe ser un arreglo" };
+            return { result: false, message: "El campo emails debe ser un arreglo" };
         }
 
         for (const email of emails) {
@@ -97,13 +97,13 @@ const sendMultipleEmails = async ({ emails, text, vehicle_plate, parking_name })
 
         const allSuccessful = results.every(r => r.success);
         return {
-            success: allSuccessful,
+            result: allSuccessful,
             message: allSuccessful ? "Todos los correos enviados correctamente" : "Algunos correos no pudieron enviarse",
             results
         };
     } catch (error) {
         logger.error("Error al enviar correos múltiples:", error);
-        return { success: false, message: "Error al enviar correos múltiples", error: error.message };
+        return { result: false, message: "Error al enviar correos múltiples", error: error.message };
     }
 };
 
