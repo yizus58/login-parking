@@ -1,65 +1,45 @@
 const cron = require('node-cron');
 const { VehiclesOutParking } = require("../controllers/vehiclesLog");
 const logger = require('../utils/logger');
-const {sendPost} = require("./http");
+const { sendPost } = require("./http");
+const generateHtmlContent = require("../public/htmlReport");
 
 function initCronJobs() {
     console.log('Cron inicializado');
+    const cronTimeDelay = process.env.CRON_HOUR_DETERMINATION;
 
-    const task = cron.schedule('59 23 * * *', () => {
-        console.log('Ejecutado 11:59 PM America/Bogota', new Date().toISOString());
-    }, {
-        scheduled: true,
-        timezone: 'America/Bogota',
-    });
-
-    const now = new Date();
-    const scheduledTime = new Date(now.getTime() + 60000);
-    const minutes = scheduledTime.getMinutes();
-    const hours = scheduledTime.getHours();
-
-    const task1 = cron.schedule(`${minutes} * * * *`, async () => {
+    const dailyTask = cron.schedule(cronTimeDelay, async () => {
         try {
-            console.log(`Ejecutando tarea a las ${scheduledTime.getHours()}:${scheduledTime.getMinutes()} America/Bogota`);
             const dataVehicleOutParking = await VehiclesOutParking();
 
             if (Object.values(dataVehicleOutParking).length === 0) {
-                return res.status(404).json({
-                    result: false,
-                    message: 'No hay vehículos que salieron del parqueadero hoy'
-                });
+                logger.error('No hay vehículos que salieron del parqueadero en la última hora');
+                return;
             }
 
             for (const vehicle of Object.values(dataVehicleOutParking)) {
                 const email = vehicle.email_partner;
-                let htmlContent = `<p>Hola ${vehicle.name_partner}, hoy ha habido un total de 
-                                ${vehicle.vehicle_count} vehículos en ${vehicle.name}. 
-                                El total de ingresos fue de $${vehicle.total_earnings}.</p><br>`;
+                const htmlContent = generateHtmlContent(vehicle);
 
-                htmlContent += `<p>Si necesitas más información, no dudes en contactar al equipo de soporte del sistema.</p><br>`;
-
-                htmlContent += `<p>Este es un mensaje automático, no responda a este correo.</p>`;
-
-                htmlContent += `<style> body {font-family: Arial, sans-serif;} p {color: #333; font-size: 19px;} 
-                        </style>`;
-
-                const send = await sendPost({recipient: email, html: htmlContent, subject: process.env.APP_SUBJECT});
-
-                if (!send.result) {
-                    logger.error('Error al enviar correo a socio:', {email, error: send.message});
+                try {
+                    const send = await sendPost({recipient: email, html: htmlContent, subject: process.env.APP_SUBJECT});
+                    if (!send.result) {
+                        logger.error('Error al enviar correo a socio:', {email, error: send.message});
+                    }
+                } catch (emailError) {
+                    logger.error('Error al enviar correo:', emailError);
                 }
             }
-            console.log('Tarea programada finalizada');
+            console.log('Tarea horaria finalizada');
         } catch (error) {
-            logger.error('Error en la tarea programada:', error);
+            logger.error('Error en la tarea horaria:', error);
         }
     }, {
         scheduled: true,
         timezone: 'America/Bogota',
     });
 
-    task.start();
-    task1.start();
+    dailyTask.start();
 }
 
 module.exports = initCronJobs;
