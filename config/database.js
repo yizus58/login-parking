@@ -24,7 +24,7 @@ function createConnSequelize(dbName) {
             dialectOptions: {
                 useUTC: false,
             },
-            timezone: '-05:00'
+            timezone: '00:00'
         }
     );
 }

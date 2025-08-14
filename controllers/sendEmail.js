@@ -1,8 +1,9 @@
 const User = require('../models/User');
 const logger = require('../utils/logger');
-const { sendEmail, sendMultipleEmails } = require('../services/emailService');
+const { sendEmail, sendMultipleEmails, sendEmailVehiclesOutToday } = require('../services/emailService');
+const { VehiclesOutParking } = require("../controllers/vehiclesLog");
 const Vehicle = require('../models/Vehicle');
-
+const axios = require('axios');
 
 const sendEmailToPartner = async (req, res) => {
     try {
@@ -31,7 +32,7 @@ const sendEmailToPartner = async (req, res) => {
 
         if (!vehicleEntry) {
             return res.status(404).json({
-                ok: false,
+                result: false,
                 msg: 'No se puede enviar el correo, no existe la placa en el parqueadero'
             });
         }
@@ -54,6 +55,32 @@ const sendEmailToPartner = async (req, res) => {
     }
 };
 
+const sendEmailToTest = async (req, res) => {
+    try {
+        const dataVehicleOutParking = await VehiclesOutParking();
+        console.log('Data:', dataVehicleOutParking);
+
+        for (const vehicle of Object.values(dataVehicleOutParking)) {
+            await sendEmailVehiclesOutToday({
+                email: vehicle.email_partner,
+                name_partner: vehicle.name_partner,
+                name_parking: vehicle.name,
+                total_vehicles: vehicle.vehicle_count,
+                total_earnings: vehicle.total_earnings,
+            });
+        }
+
+        return res.status(200).json({ success: true, message: 'Emails sent successfully' });
+
+    } catch (error) {
+        logger.error('Error al enviar correo a socio:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error al enviar correos',
+            error: error.message
+        });
+    }
+};
 
 const sendEmailToAllPartners = async (req, res) => {
     try {
@@ -88,7 +115,7 @@ const sendEmailToAllPartners = async (req, res) => {
 
         if (!vehicleEntry) {
             return res.status(404).json({
-                ok: false,
+                result: false,
                 msg: 'No se puede enviar el correo, no existe la placa en el parqueadero'
             });
         }
@@ -113,8 +140,29 @@ const sendEmailToAllPartners = async (req, res) => {
     }
 };
 
+//Ejemplo de axios
+const sendPost = async () => {
+    try {
+        const response = await axios.post('localhost:3001/mail/send', {
+            nombre: 'Juan',
+            email: 'juan@ejemplo.com',
+            edad: 25
+        }, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        console.log('Respuesta:', response.data);
+        return response.data;
+    } catch (error) {
+        console.error('Error en la petición:', error.response?.data || error.message);
+        throw error;
+    }
+};
 
 module.exports = {
     sendEmailToPartner,
-    sendEmailToAllPartners
+    sendEmailToAllPartners,
+    sendEmailToTest
 };

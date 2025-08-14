@@ -11,7 +11,7 @@ const validateParking = [
 ];
 
 const validateUpdateParking = [
-    check('id_parking', 'El parking es obligatorio').not().isEmpty(),
+    check('id', 'El ID parking es obligatorio').isInt({min: 1}),
     check('name', 'El nombre es obligatorio').not().isEmpty(),
     check('address', 'La dirección es obligatoria').not().isEmpty(),
     check('capacity', 'La capacidad es obligatoria').not().isEmpty(),
@@ -25,6 +25,11 @@ const validateIdParking = [
     validate
 ];
 
+const validateIdParams = [
+    check('id', 'El ID parking es obligatorio').isInt({min: 1}),
+    validate
+];
+
 const validateEarningPeriod = [
     check('id_parking', 'El parking es obligatorio').not().isEmpty(),
     check('start_date', 'La fecha de inicio es obligatoria').not().isEmpty(),
@@ -32,4 +37,4 @@ const validateEarningPeriod = [
     validate
 ];
 
-module.exports = { validateEarningPeriod, validateParking, validateUpdateParking, validateIdParking };
+module.exports = { validateEarningPeriod, validateParking, validateUpdateParking, validateIdParking, validateIdParams };

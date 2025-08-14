@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const logger = require("../utils/logger");
 
 const validateJWT = (req, res, next) => {
 
@@ -6,7 +7,7 @@ const validateJWT = (req, res, next) => {
 
     if ( !token ) {
         return res.status(401).json({
-            ok:false,
+            result:false,
             msg:'No hay token en la peticion'
         });
     }
@@ -16,7 +17,7 @@ const validateJWT = (req, res, next) => {
     }
 
     try {
-        
+
         const { uid } = jwt.verify( token, process.env.JWT_KEY);
 
         req.uid = uid;
@@ -24,10 +25,12 @@ const validateJWT = (req, res, next) => {
         next();
 
     } catch (error) {
+        logger.error(error);
         return res.status(401).json({
-            ok:false,
+            result:false,
             msg:'Token no valido'
         });
+
     }
 
 

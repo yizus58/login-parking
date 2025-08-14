@@ -39,6 +39,10 @@ const Vehicle = sequelize.define('Vehicle', {
             key: 'id'
         }
     },
+    cost_per_hour: {
+        type: DataTypes.FLOAT,
+        allowNull: false
+    },
     status: {
         type: DataTypes.ENUM('IN', 'OUT'),
         allowNull: false,

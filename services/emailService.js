@@ -16,6 +16,7 @@ const createTransporter = () => {
 const sendEmail = async ({ email, text, vehicle_plate, parking_name }) => {
     try {
         if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+            console.log("Correo simulado no enviado, por favor verifica las credenciales");
             return { success: true, message: "Correo simulado enviado" };
         }
 
@@ -41,6 +42,43 @@ const sendEmail = async ({ email, text, vehicle_plate, parking_name }) => {
     } catch (error) {
         logger.error("Error al enviar correo:", error);
         return { success: false, message: "Error al enviar correo", error: error.message };
+    }
+};
+
+const sendEmailVehiclesOutToday = async ({ email, name_partner, name_parking, total_vehicles, total_earnings }) => {
+    try {
+        console.log("EMAIL ",email);
+        if (!email) {
+            return { success: false, message: "El campo email no puede estar vacío" };
+        }
+
+        if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+            return { success: false, message: "Correo simulado no enviado, por favor verifica las credenciales" };
+        }
+
+        const transporter = createTransporter();
+
+        let htmlContent = `<p>Hola ${name_partner}, hoy ha habido un total de 
+                                ${total_vehicles} vehículos en ${name_parking}. 
+                                El total de ingresos fue de $${total_earnings}.</p><br>`;
+
+        htmlContent += `<p>Si necesitas más información, no dudes contactar con el equipo de soporte del sistema.</p>`;
+
+        let subject = "Reporte de vehículos salientes hoy";
+        let replyTo = process.env.ADMIN_EMAIL;
+        let from = `"Sistema de Parqueadero" <${process.env.ADMIN_EMAIL}>`;
+
+        const info = await transporter.sendMail({
+            from: from,
+            to: email,
+            subject: subject,
+            html: htmlContent,
+            replyTo: replyTo,
+        });
+        return { success: true, message: "Correo enviado correctamente", messageId: info.messageId };
+    } catch (error) {
+        logger.error("Error al enviar correo vehículos salientes hoy:", error);
+        return { success: false, message: "Error al enviar correo vehículos salientes hoy", error: error.message };
     }
 };
 
@@ -71,5 +109,6 @@ const sendMultipleEmails = async ({ emails, text, vehicle_plate, parking_name })
 
 module.exports = {
     sendEmail,
-    sendMultipleEmails
+    sendMultipleEmails,
+    sendEmailVehiclesOutToday
 };

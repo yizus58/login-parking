@@ -1,7 +1,7 @@
 require('dotenv').config();
 const {Op} = require("sequelize");
 const { response } = require('express');
-const { validateUserRole, validateVehiclePlate, responseError, userRoleResponse } = require('../utils/validation');
+const { validateUserRole, validatePlate, validateVehiclePlate, responseError, userRoleResponse, validateCapacity } = require('../utils/validation');
 const db = require('../config/database');
 const logger = require('../utils/logger');
 const Parking = require('../models/Parking');
@@ -29,11 +29,11 @@ const getCurrentWeekDates = () => {
 };
 
 const EntryVehicle = async (req, res = response) => {
-    const { id_parking, vehicle_plate, model_vehicle } = req.body;
+    let { id_parking, vehicle_plate, model_vehicle } = req.body;
     const uid = req.uid;
 
     try {
-
+        vehicle_plate = vehicle_plate.toUpperCase();
         const validateUser = await validateUserRole(uid);
         if (validateUser === idAdmin) {
             return userRoleResponse(validateUser, res);
@@ -41,66 +41,80 @@ const EntryVehicle = async (req, res = response) => {
 
         let verifyPlate = vehicle_plate.replace(/-/g, '');
         const validatePlate = validateVehiclePlate(verifyPlate);
-        if (validatePlate !== 0) {
-            return responseError(validatePlate, res);
-        }
+        if (validatePlate !== 0) return responseError(validatePlate, res);
 
         const parking = await Parking.findByPk(id_parking);
         if (!parking) {
             return res.status(404).json({
-                ok: false,
+                result: false,
                 msg: 'Parqueadero no encontrado'
             });
         }
 
+        if (vehicle_plate.length !== 7) {
+            const letters = vehicle_plate.substring(0, 3);
+            const numbers = vehicle_plate.substring(3);
+
+            if (/^[A-Z]{3}$/.test(letters) && /^\d{3}$/.test(numbers)) {
+                vehicle_plate = `${letters}-${numbers}`;
+            }
+        }
+
         const findVehicle = await Vehicle.findOne({
             where: {
-                plate_number: vehicle_plate
+                plate_number: vehicle_plate,
+                status: "IN"
             }
         });
 
-        if (findVehicle && findVehicle.status === 'IN') {
+        const cost = parseFloat(parking.cost_per_hour);
 
+        if (findVehicle) {
             if (findVehicle.id_parking === id_parking) {
                 return res.status(400).json({
-                    ok: false,
+                    result: false,
                     msg: 'No se puede Registrar Ingreso, el vehículo ya se encuentra dentro del parqueadero'
                 });
             }
 
+
             return res.status(400).json({
-                ok: false,
+                result: false,
                 msg: 'No se puede Registrar Ingreso, ya existe la placa en otro parqueadero'
             });
         }
+
+        const validateNewCapacity = await validateCapacity(parking, parking.capacity, res);
+        if (validateNewCapacity) return validateNewCapacity;
 
         const currentTime = new Date();
         const entryTime = new Date(currentTime.getTime() - (5 * 60 * 60 * 1000));
 
         const vehicleEntry = new Vehicle(
-            { id_parking, plate_number: vehicle_plate, model_vehicle, entry_time: entryTime, id_admin: uid }
+            { id_parking, plate_number: vehicle_plate, model_vehicle, entry_time: entryTime, cost_per_hour: cost, id_admin: uid }
         );
 
         await vehicleEntry.save();
 
         res.status(201).json({
-            ok: true,
+            result: true,
             data: vehicleEntry
         });
     } catch (error) {
         logger.error(error);
         return res.status(500).json({
-            ok: false,
+            result: false,
             msg: 'Oops, a ocurrido un error, por favor comuniquese con el equipo de soporte'
         });
     }
 }
 
 const ExitVehicle = async (req, res = response) => {
-    const { id_parking, vehicle_plate } = req.body;
+    let { id_parking, vehicle_plate } = req.body;
     const uid = req.uid;
 
     try {
+        vehicle_plate = vehicle_plate.toUpperCase();
         const validateUser = await validateUserRole(uid);
         if (validateUser === idAdmin) {
             return userRoleResponse(validateUser, res);
@@ -110,8 +124,16 @@ const ExitVehicle = async (req, res = response) => {
 
         if (!parking) {
             return res.status(404).json({
-                ok: false,
+                result: false,
                 msg: 'Parqueadero no encontrado'
+            });
+        }
+
+        const verifyPlate = await validatePlate(id_parking, vehicle_plate)
+        if (!verifyPlate) {
+            return res.status(404).json({
+                result: false,
+                msg: 'No se puede Registrar Salida, no existe la placa en el parqueadero'
             });
         }
 
@@ -125,7 +147,7 @@ const ExitVehicle = async (req, res = response) => {
 
         if (!vehicleEntry) {
             return res.status(404).json({
-                ok: false,
+                result: false,
                 msg: 'No se puede Registrar Salida, no existe la placa en el parqueadero'
             });
         }
@@ -133,13 +155,13 @@ const ExitVehicle = async (req, res = response) => {
         const currentTime = new Date();
         const exitTime = new Date(currentTime.getTime() - (5 * 60 * 60 * 1000));
 
-        const costParking = parking.cost_per_hour;
+        const costParking = vehicleEntry.cost_per_hour;
 
         const entryTime = new Date(vehicleEntry.entry_time);
         const timeDifference = Math.abs(exitTime - entryTime);
         const minutesParked = Math.floor(timeDifference / (1000 * 60));
 
-        const totalCost = Math.floor((minutesParked / 60) * costParking);
+        const totalCost = Math.ceil(minutesParked / 60) * costParking;
 
         vehicleEntry.exit_time = exitTime;
         await Vehicle.update(
@@ -147,19 +169,20 @@ const ExitVehicle = async (req, res = response) => {
             { where: { id_parking, plate_number: vehicle_plate } }
         );
 
-        const { id_admin, id_parking: parking_id, ...vehicleWithOutIds } = vehicleEntry.toJSON();
+        const { id_admin, ...vehicleWithOutIds } = vehicleEntry.toJSON();
+        delete vehicleWithOutIds.id_parking;
 
-        vehicleWithOutIds.total_cost = totalCost.toLocaleString('en-US');
+        vehicleWithOutIds.total_cost = totalCost;
 
         res.status(200).json({
-            ok: true,
+            result: true,
             data: vehicleWithOutIds,
             msg: 'Salida registrada',
         });
     } catch (error) {
         logger.error(error);
         return res.status(500).json({
-            ok: false,
+            result: false,
             msg: 'Oops, a ocurrido un error, por favor comuniquese con el equipo de soporte'
         });
     }
@@ -193,13 +216,13 @@ const getTopVehicles = async (req, res = response) => {
         });
 
         res.status(200).json({
-            ok: true,
-            data: topVehiclesWithoutIds
+            result: true,
+            topVehiclesWithoutIds
         });
     } catch (error) {
         logger.error(error);
         return res.status(500).json({
-            ok: false,
+            result: false,
             msg: 'Ha ocurrido un error, por favor comuníquese con el equipo de soporte'
         });
     }
@@ -231,15 +254,15 @@ const getFirstTimeParkedVehicles = async (req, res = response) => {
         });
 
         res.status(200).json({
-            ok: true,
+            result: true,
             total: firstTimeVehiclesWithoutIds.length,
-            data: firstTimeVehiclesWithoutIds
+            firstTimeVehiclesWithoutIds
         });
 
     } catch (error) {
         logger.error(error);
         return res.status(500).json({
-            ok: false,
+            result: false,
             msg: 'Ha ocurrido un error, por favor comuníquese con el equipo de soporte'
         });
     }
@@ -301,13 +324,13 @@ const getTopVehiclesByParking = async (req, res = response) => {
         }));
 
         res.status(200).json({
-            ok: true,
+            result: true,
             data: topVehiclesWithParkings
         });
     } catch (error) {
         logger.error(error);
         return res.status(500).json({
-            ok: false,
+            result: false,
             msg: 'Ha ocurrido un error, por favor comuníquese con el equipo de soporte'
         });
     }
@@ -326,7 +349,7 @@ const getEarningsByPeriod = async (req, res = response) => {
         const parking = await Parking.findByPk(id_parking);
         if (!parking) {
             return res.status(404).json({
-                ok: false,
+                result: false,
                 msg: 'Parqueadero no encontrado'
             });
         }
@@ -337,7 +360,7 @@ const getEarningsByPeriod = async (req, res = response) => {
 
             if (!isValidDate(start_date) || !isValidDate(end_date)) {
                 return res.status(400).json({
-                    ok: false,
+                    result: false,
                     msg: 'Formato de fecha inválido. Use: DD-MM-YYYY'
                 });
             }
@@ -347,7 +370,7 @@ const getEarningsByPeriod = async (req, res = response) => {
 
             if (startDate > endDate) {
                 return res.status(400).json({
-                    ok: false,
+                    result: false,
                     msg: 'La fecha inicial debe ser menor que la fecha final'
                 });
             }
@@ -372,13 +395,14 @@ const getEarningsByPeriod = async (req, res = response) => {
             },
             attributes: [
                 'entry_time',
-                'exit_time'
+                'exit_time',
+                'cost_per_hour'
             ]
         });
 
         if (vehicles.length === 0) {
             return res.status(200).json({
-                ok: true,
+                result: true,
                 msg: "No se encontraron vehiculos en el parqueadero",
                 data: {}
             });
@@ -387,17 +411,22 @@ const getEarningsByPeriod = async (req, res = response) => {
         let totalEarnings = 0;
         vehicles.forEach(vehicle => {
             const entryTime = new Date(vehicle.entry_time);
+
             const exitTime = new Date(vehicle.exit_time);
+
             const timeDifference = Math.abs(exitTime - entryTime);
-            const hoursParked = Math.ceil(timeDifference / (1000 * 60 * 60));
-            totalEarnings += hoursParked * parking.cost_per_hour;
+            const minutesParked = Math.floor(timeDifference / (1000 * 60));
+
+            const totalCost = Math.ceil((minutesParked / 60) * vehicle.cost_per_hour);
+
+            totalEarnings += totalCost;
         });
 
         res.status(200).json({
-            ok: true,
+            result: true,
             data: {
                 period,
-                totalEarnings: totalEarnings.toLocaleString('en-US'),
+                totalEarnings: totalEarnings,
                 totalVehicles: vehicles.length,
                 startDate,
                 endDate,
@@ -409,7 +438,7 @@ const getEarningsByPeriod = async (req, res = response) => {
     } catch (error) {
         logger.error(error);
         return res.status(500).json({
-            ok: false,
+            result: false,
             msg: 'Ha ocurrido un error, por favor comuníquese con el equipo de soporte'
         });
     }
@@ -433,6 +462,105 @@ const parseDateString = (dateString) => {
     return date;
 };
 
+const getVehiclesOut = async () => {
+    const startOfDay = new Date();
+    startOfDay.setUTCHours(0, 0, 0, 0); // Establece la hora a las 00:00:00 UTC
+
+    const endOfDay = new Date();
+    endOfDay.setUTCHours(23, 59, 59, 999); // Establece la hora a las 23:59:59 UTC
+
+    const findVehiclesOut = await Vehicle.findAll({
+        attributes: [
+            'id_parking',
+            'entry_time',
+            'exit_time',
+            'cost_per_hour',
+        ],
+        include: [{
+            model: Parking,
+            attributes: ['name']
+        }],
+        where: {
+            exit_time: {
+                [Op.gte]: startOfDay,
+                [Op.lte]: endOfDay,
+            },
+            status: 'OUT'
+        },
+        raw: true,
+    });
+
+    const parkingEarnings = {};
+
+    findVehiclesOut.forEach(vehicle => {
+        const parkingId = vehicle.id_parking;
+        const parkingName = vehicle['Parking.name'];
+        const costPerHour = vehicle.cost_per_hour;
+
+        const entryTime = new Date(vehicle.entry_time);
+        const exitTime = new Date(vehicle.exit_time);
+        const timeDifference = Math.abs(exitTime - entryTime);
+        const minutesParked = Math.floor(timeDifference / (1000 * 60));
+
+        const totalCost = Math.ceil((minutesParked / 60) * costPerHour);
+
+        if (!parkingEarnings[parkingId]) {
+            parkingEarnings[parkingId] = {
+                id: parkingId,
+                name: parkingName,
+                total_earnings: 0,
+                vehicle_count: 0
+            };
+        }
+
+        parkingEarnings[parkingId].total_earnings += totalCost;
+        parkingEarnings[parkingId].vehicle_count += 1;
+    });
+
+    return Object.values(parkingEarnings)
+        .sort((a, b) => b.total_earnings - a.total_earnings)
+        .slice(0, 3)
+        .map(parking => ({
+            ...parking,
+            total_earnings: parking.total_earnings
+        }));
+}
+
+
+const VehiclesOutParking = async () => {
+    const allVehicles = await getVehiclesOut();
+
+    const infoParking = {};
+
+    for (const parking of allVehicles) {
+        const parkingName = parking.name;
+        const vehicleCount = parking.vehicle_count;
+        const totalEarnings = parking.total_earnings;
+
+        const userEmail = await Parking.findAll({
+            include: [
+                {
+                    model: User,
+                    as: 'partner',
+                    attributes: ['username', 'email']
+                },
+            ],
+            where: { id: parking.id }
+        });
+
+        if (!infoParking[parking.id]) {
+            infoParking[parking.id] = {
+                id: parking.id,
+                name: parkingName,
+                vehicle_count: vehicleCount,
+                total_earnings: totalEarnings,
+                email_partner: userEmail.map(user => user.partner.email).join(', '),
+                name_partner: userEmail.map(user => user.partner.username).join(', ')
+            }
+        }
+    }
+    return infoParking;
+}
 
 const getTopPartnersCurrentWeek = async (req, res = response) => {
     const uid = req.uid;
@@ -475,7 +603,7 @@ const getTopPartnersCurrentWeek = async (req, res = response) => {
         });
 
         res.status(200).json({
-            ok: true,
+            result: true,
             data: {
                 week_start: startOfWeek,
                 week_end: endOfWeek,
@@ -486,7 +614,7 @@ const getTopPartnersCurrentWeek = async (req, res = response) => {
     } catch (error) {
         logger.error(error);
         return res.status(500).json({
-            ok: false,
+            result: false,
             msg: 'Ha ocurrido un error, por favor comuníquese con el equipo de soporte'
         });
     }
@@ -507,11 +635,12 @@ const getTopParkingsEarningsCurrentWeek = async (req, res = response) => {
             attributes: [
                 'id_parking',
                 'entry_time',
-                'exit_time'
+                'exit_time',
+                'cost_per_hour'
             ],
             include: [{
                 model: Parking,
-                attributes: ['name', 'cost_per_hour']
+                attributes: ['name']
             }],
             where: {
                 exit_time: {
@@ -528,13 +657,14 @@ const getTopParkingsEarningsCurrentWeek = async (req, res = response) => {
         vehicles.forEach(vehicle => {
             const parkingId = vehicle.id_parking;
             const parkingName = vehicle['Parking.name'];
-            const costPerHour = vehicle['Parking.cost_per_hour'];
+            const costPerHour = vehicle.cost_per_hour;
 
             const entryTime = new Date(vehicle.entry_time);
             const exitTime = new Date(vehicle.exit_time);
             const timeDifference = Math.abs(exitTime - entryTime);
-            const hoursParked = Math.ceil(timeDifference / (1000 * 60 * 60));
-            const earnings = hoursParked * costPerHour;
+            const minutesParked = Math.floor(timeDifference / (1000 * 60));
+
+            const totalCost = Math.ceil((minutesParked / 60) * costPerHour);
 
             if (!parkingEarnings[parkingId]) {
                 parkingEarnings[parkingId] = {
@@ -545,7 +675,7 @@ const getTopParkingsEarningsCurrentWeek = async (req, res = response) => {
                 };
             }
 
-            parkingEarnings[parkingId].total_earnings += earnings;
+            parkingEarnings[parkingId].total_earnings += totalCost;
             parkingEarnings[parkingId].vehicle_count += 1;
         });
 
@@ -554,11 +684,11 @@ const getTopParkingsEarningsCurrentWeek = async (req, res = response) => {
             .slice(0, 3)
             .map(parking => ({
                 ...parking,
-                total_earnings: parking.total_earnings.toLocaleString('en-US')
+                total_earnings: parking.total_earnings
             }));
 
         res.status(200).json({
-            ok: true,
+            result: true,
             data: {
                 week_start: startOfWeek,
                 week_end: endOfWeek,
@@ -569,7 +699,7 @@ const getTopParkingsEarningsCurrentWeek = async (req, res = response) => {
     } catch (error) {
         logger.error(error);
         return res.status(500).json({
-            ok: false,
+            result: false,
             msg: 'Ha ocurrido un error, por favor comuníquese con el equipo de soporte'
         });
     }
@@ -583,5 +713,6 @@ module.exports = {
     getTopVehicles,
     getTopPartnersCurrentWeek,
     getTopParkingsEarningsCurrentWeek,
-    getTopVehiclesByParking
+    getTopVehiclesByParking,
+    VehiclesOutParking
 }

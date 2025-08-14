@@ -4,7 +4,8 @@ const { validateJWT } = require('../middlewares/validate-jwt');
 const { EntryVehicle, ExitVehicle } = require("../controllers/vehiclesLog");
 const router = Router();
 
-router.post('/entry_vehicle', ...validateVehicle, validateJWT, EntryVehicle);
-router.post('/exit_vehicle', ...validateVehiclePlate, validateJWT, ExitVehicle);
+
+router.post('/', ...validateVehicle, validateJWT, EntryVehicle);
+router.put('/', ...validateVehiclePlate, validateJWT, ExitVehicle);
 
 module.exports = router;
