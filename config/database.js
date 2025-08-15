@@ -1,58 +1,53 @@
-const { Sequelize } = require("sequelize");
-require("dotenv").config();
+const { Sequelize } = require('sequelize');
+const pg = require('pg');
+const dotenv = require('dotenv');
 
-let sequelize;
+dotenv.config();
 
-function createConnSequelize(dbName) {
-    return new Sequelize(
-        dbName,
-        process.env.DB_USER,
-        process.env.DB_PASSWORD,
-        {
-            host: process.env.DB_HOST,
-            port: process.env.DB_PORT,
-            dialect: "postgres",
-            logging: false,
-            define: {
-                timestamps: false,
-                createdAt: false,
-                updatedAt: false,
-                deletedAt: false,
-                charset: 'utf8',
-                collate: 'utf8_general_ci',
-            },
-            dialectOptions: {
-                useUTC: false,
-            },
-            timezone: '00:00'
-        }
-    );
-}
+const { DB_NAME, DB_NAME_TEST, DB_USER, DB_PASSWORD, DB_HOST, NODE_ENV } = process.env;
 
-async function ensureDatabaseExists() {
-    const tempSequelize = createConnSequelize("postgres");
+const dbName = NODE_ENV === 'test'? DB_NAME_TEST : DB_NAME;
+const dbUser = DB_USER;
+const dbPassword = DB_PASSWORD;
+const dbHost = DB_HOST;
+
+const createDbIfNotExists = async () => {
+    const client = new pg.Client({
+        user: dbUser,
+        password: dbPassword,
+        host: dbHost,
+        database: 'postgres',
+    });
+
     try {
-        await tempSequelize.query(`CREATE DATABASE "${process.env.DB_NAME}"`);
-    } catch (err) {
-        if (err.original && err.original.code !== '42P04') {
-            console.error("Error al crear la base de datos:", err);
+        await client.connect();
+        const result = await client.query(`SELECT 1 FROM pg_database WHERE datname='${dbName}'`);
+        if (result.rowCount === 0) {
+            await client.query(`CREATE DATABASE ${dbName}`);
         }
+    } catch (err) {
+        console.error('Error creating database:', err);
     } finally {
-        await tempSequelize.close();
+        await client.end();
     }
-}
+};
 
-async function connectToDatabase() {
+const sequelize = new Sequelize(dbName, dbUser, dbPassword, {
+    host: dbHost,
+    dialect: 'postgres',
+    logging: NODE_ENV === 'test' ? false : console.log,
+});
+
+const connectToDatabase = async () => {
     try {
-        await ensureDatabaseExists();
-        sequelize = createConnSequelize(process.env.DB_NAME);
+        await createDbIfNotExists();
         await sequelize.authenticate();
-    } catch (err) {
-        console.error("Error de conexión", err);
+    } catch (error) {
+        console.error('Unable to connect to the database:', error);
     }
-}
+};
 
 module.exports = {
     connectToDatabase,
-    get sequelize() { return sequelize; }
+    sequelize,
 };

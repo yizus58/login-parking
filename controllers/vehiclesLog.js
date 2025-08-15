@@ -95,7 +95,6 @@ const EntryVehicle = async (req, res = response) => {
         await vehicleEntry.save();
 
         vehicleEntry.entry_time = new Date(currentTime.getTime() - (5 * 60 * 60 * 1000));
-        console.log(vehicleEntry.entry_time);
 
         res.status(201).json({
             result: true,
@@ -604,9 +603,6 @@ const getTopPartnersCurrentWeek = async (req, res = response) => {
             limit: 3,
             raw: true
         });
-
-        console.log("Start of week", startOfWeek);
-        console.log("End of week", endOfWeek);
 
         res.status(200).json({
             result: true,

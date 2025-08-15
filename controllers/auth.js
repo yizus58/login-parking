@@ -7,23 +7,29 @@ const logger = require('../utils/logger');
 const User = require('../models/user');
 const idAdmin = Number(process.env.ID_ADMIN);
 
-User.sequelize.sync().then(async () => {
-    const adminEmail = process.env.ADMIN_EMAIL;
-
-    const admin = await User.findOne({ where: { email: adminEmail } });
-    if (!admin) {
-
-        const salt = bcrypt.genSaltSync();
-        const hashedPassword = bcrypt.hashSync(process.env.ADMIN_PASSWORD, salt);
-
-        await User.create({
-            username: 'admin',
-            email: adminEmail,
-            password: hashedPassword,
-            role: 'ADMIN'
-        });
+async function ensureAdminSeed() {
+    try {
+        const adminEmail = process.env.ADMIN_EMAIL;
+        if (!adminEmail) return;
+        const admin = await User.findOne({ where: { email: adminEmail } });
+        if (!admin) {
+            const salt = bcrypt.genSaltSync();
+            const hashedPassword = bcrypt.hashSync(process.env.ADMIN_PASSWORD, salt);
+            await User.create({
+                username: 'admin',
+                email: adminEmail,
+                password: hashedPassword,
+                role: 'ADMIN'
+            });
+        }
+    } catch (e) {
+        logger.error('Error ensuring admin seed:', e);
     }
-});
+}
+
+if (process.env.NODE_ENV !== 'test') {
+    User.sequelize.sync().then(() => ensureAdminSeed());
+}
 
 
 const createUser = async (req, res = response) => {
@@ -155,5 +161,6 @@ module.exports = {
     createUser,
     login,
     renewToken,
-    getAllUsers
+    getAllUsers,
+    ensureAdminSeed
 }

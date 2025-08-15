@@ -4,6 +4,7 @@ const cors = require('cors');
 const { connectToDatabase } = require('../config/database');
 require('../models/associations');
 const initCronJobs = require("../config/cron");
+const {ensureAdminSeed} = require("../controllers/auth");
 
 class Server {
     constructor() {
@@ -46,6 +47,7 @@ class Server {
     async start() {
         try {
             await connectToDatabase();
+            await ensureAdminSeed();
             this.app.listen(this.port, () => {
                 console.log(`Server is running on port ${this.port}`);
             });
