@@ -3,8 +3,7 @@ const authRoutes = require('../routes/authRoutes');
 const express = require("express");
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
-const Vehicle = require("../models/Vehicle");
-const Parking = require("../models/Parking");
+const logger = require("./logger");
 
 const app = express();
 app.use(express.json());
@@ -18,7 +17,6 @@ let token = null;
 async function getToken(admin = true) {
     if (!token) {
         if (!admin) {
-            console.log('No admin token found. Creating one...');
             mail = process.env.TEST_USER_EMAIL;
             pass = process.env.TEST_USER_PASSWORD;
             await createTestUser();
@@ -26,17 +24,18 @@ async function getToken(admin = true) {
 
         const response = await request(app)
             .post('/api/auth/')
-            .send({ email: mail, password: pass });
+            .send({email: mail, password: pass});
         token = response.body.token;
     }
     return token;
 }
 
-const createUser = async (mail, pass, rol= 'ADMIN') => {
+const createUser = async (mail, pass, rol = 'ADMIN') => {
     await User.sequelize.sync();
-    const username = rol === 'ADMIN'? 'admin' : 'jdoe';
+    const username = rol === 'ADMIN' ? 'admin' : 'jdoe';
+    let id = null;
 
-    const findUser = await User.findOne({ where: { email: mail } });
+    const findUser = await User.findOne({where: {email: mail}});
     if (!findUser) {
         const salt = await bcrypt.genSalt();
         const hashedPassword = await bcrypt.hash(pass, salt);
@@ -46,23 +45,13 @@ const createUser = async (mail, pass, rol= 'ADMIN') => {
             password: hashedPassword,
             role: rol
         });
-        const id = save.id;
-        console.log(`User ${mail} created with ID: ${id}`);
+        id = save.id;
     }
+    return findUser !== null ? findUser.id : id;
 }
 
 const createTestUser = async () => {
-    console.log('Creating test user...');
     await createUser(process.env.TEST_USER_EMAIL, process.env.TEST_USER_PASSWORD, 'SOCIO');
 }
 
-
-const findUsers = async (id) => {
-    const findParkingSpace = await Parking.findByPk(id);
-    if (!findParkingSpace) {
-        throw new Error('Parking space not found');
-    }
-    console.log('Parking space found:', findParkingSpace.dataValues);
-}
-
-module.exports = { getToken, createUser, findUsers };
+module.exports = {getToken, createUser};

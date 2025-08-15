@@ -37,7 +37,6 @@ const createDbIfNotExists = async () => {
             await client.query(`CREATE DATABASE "${dbName}"`);
         }
     } catch (error) {
-        console.log(error.code);
         if (error.code !== '42P04') {
             logger.error(`Error creating database: ${error.message}`);
         }

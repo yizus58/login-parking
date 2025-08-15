@@ -13,6 +13,13 @@ beforeAll(async () => {
     global.token = await getToken();
 });
 
+afterAll(async () => {
+    if (sequelize && sequelize.close) {
+        await sequelize.close();
+    }
+});
+
+
 test('GET Get Ranked Partners', async () => {
     const response = await request(app)
         .get('/api/ranked-partners/')

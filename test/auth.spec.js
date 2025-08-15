@@ -1,7 +1,7 @@
 const request = require('supertest');
 const express = require('express');
 const authRoutes = require('../routes/authRoutes');
-const { connectToDatabase } = require('../config/database');
+const { connectToDatabase, sequelize} = require('../config/database');
 const { createUser } = require("../utils/testUtils");
 
 const app = express();
@@ -12,6 +12,13 @@ beforeAll(async () => {
     await connectToDatabase();
     await createUser(process.env.ADMIN_EMAIL, process.env.ADMIN_PASSWORD);
 });
+
+afterAll(async () => {
+    if (sequelize && sequelize.close) {
+        await sequelize.close();
+    }
+});
+
 
 test('POST /login', async () => {
     const user = {

@@ -11,9 +11,14 @@ app.use('/api/details', detailsRoute);
 beforeAll(async () => {
     await connectToDatabase();
     global.token = await getToken();
-
-    //await new Promise(resolve => setTimeout(resolve, 1000));
 });
+
+afterAll(async () => {
+    if (sequelize && sequelize.close) {
+        await sequelize.close();
+    }
+});
+
 
 test('GET Earnings By Period', async () => {
     const data = {

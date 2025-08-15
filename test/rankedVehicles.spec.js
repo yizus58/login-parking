@@ -1,12 +1,12 @@
 const request = require('supertest');
 const express = require('express');
-const indicatorRoute = require('../routes/indicatorRoutes');
+const rankedVehiclesRoute = require('../routes/rankedVehicleRoutes');
 const { connectToDatabase, sequelize } = require('../config/database');
 const { getToken } = require('../utils/testUtils');
 
 const app = express();
 app.use(express.json());
-app.use('/api/indicators', indicatorRoute);
+app.use('/api/ranked-vehicles', rankedVehiclesRoute);
 
 beforeAll(async () => {
     await connectToDatabase();
@@ -19,13 +19,21 @@ afterAll(async () => {
     }
 });
 
-test('GET First Time Parking', async () => {
 
+test('GET Get Ranked Vehicles', async () => {
     const response = await request(app)
-        .get('/api/indicators/')
+        .get('/api/ranked-vehicles/')
         .set('Authorization', `Bearer ${global.token}`);
 
     expect(response.body.result).toBe(true);
     expect(Array.isArray(response.body.data)).toBe(true);
-});
 
+    if (response.body.data.length > 0) {
+        const firstRanking = response.body.data[0];
+        expect(firstRanking).toHaveProperty('plate_number');
+        expect(firstRanking).toHaveProperty('total_visits');
+
+        expect(typeof firstRanking.plate_number).toBe('string');
+        expect(typeof firstRanking.total_visits).toBe('number');
+    }
+});
