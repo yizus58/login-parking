@@ -5,6 +5,7 @@ const logger = require('../utils/logger');
 const Parking = require('../models/Parking');
 const User = require('../models/User');
 const Vehicle = require('../models/Vehicle');
+require('../models/associations');
 const idAdmin = Number(process.env.ID_ADMIN);
 
 const createParking = async (req, res = response) => {

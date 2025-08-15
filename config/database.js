@@ -1,15 +1,21 @@
-const { Sequelize } = require('sequelize');
-const pg = require('pg');
 const dotenv = require('dotenv');
+const { Sequelize } = require('sequelize');
+const fs = require('fs');
+const path = require('path');
+const pg = require('pg');
+const logger = require("../utils/logger");
 
 dotenv.config();
 
 const { DB_NAME, DB_NAME_TEST, DB_USER, DB_PASSWORD, DB_HOST, NODE_ENV } = process.env;
 
-const dbName = NODE_ENV === 'test'? DB_NAME_TEST : DB_NAME;
+const dbName = NODE_ENV === 'test' ? DB_NAME_TEST : DB_NAME;
 const dbUser = DB_USER;
 const dbPassword = DB_PASSWORD;
 const dbHost = DB_HOST;
+
+let migrationsExecuted = false;
+let migrationPromise = null;
 
 const createDbIfNotExists = async () => {
     const client = new pg.Client({
@@ -21,12 +27,20 @@ const createDbIfNotExists = async () => {
 
     try {
         await client.connect();
-        const result = await client.query(`SELECT 1 FROM pg_database WHERE datname='${dbName}'`);
-        if (result.rowCount === 0) {
-            await client.query(`CREATE DATABASE ${dbName}`);
+
+        const result = await client.query(
+            'SELECT 1 FROM pg_database WHERE datname = $1',
+            [dbName]
+        );
+
+        if (result.rows.length === 0) {
+            await client.query(`CREATE DATABASE "${dbName}"`);
         }
-    } catch (err) {
-        console.error('Error creating database:', err);
+    } catch (error) {
+        console.log(error.code);
+        if (error.code !== '42P04') {
+            logger.error(`Error creating database: ${error.message}`);
+        }
     } finally {
         await client.end();
     }
@@ -35,19 +49,178 @@ const createDbIfNotExists = async () => {
 const sequelize = new Sequelize(dbName, dbUser, dbPassword, {
     host: dbHost,
     dialect: 'postgres',
-    logging: NODE_ENV === 'test' ? false : console.log,
+    logging: false,
+    pool: {
+        max: 5,
+        min: 0,
+        acquire: 30000,
+        idle: 10000
+    }
 });
+
+const runMigrations = async () => {
+
+    if (migrationsExecuted) {
+        return;
+    }
+
+    if (migrationPromise) {
+        return migrationPromise;
+    }
+
+    if (NODE_ENV !== 'test') {
+        migrationsExecuted = true;
+        return;
+    }
+
+    migrationPromise = (async () => {
+        const client = new pg.Client({
+            user: dbUser,
+            password: dbPassword,
+            host: dbHost,
+            database: dbName,
+        });
+
+        try {
+            await client.connect();
+
+            const tablesExist = await client.query(`
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name IN ('users', 'parkings', 'vehicles')
+            `);
+
+            if (tablesExist.rows.length === 3) {
+                migrationsExecuted = true;
+                return;
+            }
+
+            try {
+                await client.query('DROP TABLE IF EXISTS vehicles CASCADE');
+                await client.query('DROP TABLE IF EXISTS parkings CASCADE');
+                await client.query('DROP TABLE IF EXISTS users CASCADE');
+                await client.query('DROP TYPE IF EXISTS enum_vehicles_status CASCADE');
+            } catch (dropError) {
+                logger.log('Tables did not exist, continuing...', dropError);
+            }
+
+            const migrationPath = path.join(__dirname, '..', 'migrations', 'database.sql');
+
+            if (!fs.existsSync(migrationPath)) {
+                throw new Error(`Migration file not found: ${migrationPath}`);
+            }
+
+            const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+
+            const cleanSQL = migrationSQL
+                .replace(/--.*$/gm, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            const rawCommands = cleanSQL.split(';').filter(cmd => cmd.trim().length > 0);
+            const commands = rawCommands.map(cmd => cmd.trim() + ';');
+
+            const createTypeCommands = commands.filter(cmd => cmd.toUpperCase().includes('CREATE TYPE'));
+            const createTableCommands = commands.filter(cmd => cmd.toUpperCase().includes('CREATE TABLE'));
+            const insertCommands = commands.filter(cmd => cmd.toUpperCase().includes('INSERT INTO'));
+
+            for (let i = 0; i < createTypeCommands.length; i++) {
+                const command = createTypeCommands[i];
+                try {
+                    await client.query(command);
+                } catch (typeError) {
+
+                    if (typeError.code === '42710') {
+                        continue;
+                    }
+                    console.error(`✗ Error in CREATE TYPE command ${i + 1}:`, typeError.message);
+                    throw typeError;
+                }
+            }
+
+            const tableOrder = ['users', 'parkings', 'vehicles'];
+            for (const tableName of tableOrder) {
+                const tableCommand = createTableCommands.find(cmd =>
+                    cmd.toUpperCase().includes(`CREATE TABLE PUBLIC.${tableName.toUpperCase()}`)
+                );
+                if (tableCommand) {
+                    try {
+                        await client.query(tableCommand);
+                    } catch (tableError) {
+                        if (tableError.code === '42P07') {
+                            continue;
+                        }
+                        console.error(`✗ Error creating table ${tableName}:`, tableError.message);
+                        throw tableError;
+                    }
+                } else {
+                    console.warn(`⚠ CREATE TABLE command for ${tableName} not found`);
+                }
+            }
+
+            for (const tableName of tableOrder) {
+                const insertCommand = insertCommands.find(cmd =>
+                    cmd.toUpperCase().includes(`INSERT INTO PUBLIC.${tableName.toUpperCase()}`)
+                );
+                if (insertCommand) {
+                    try {
+
+                        const existingData = await client.query(`SELECT COUNT(*) FROM ${tableName}`);
+                        if (parseInt(existingData.rows[0].count) > 0) {
+                            continue;
+                        }
+
+                        await client.query(insertCommand);
+                    } catch (insertError) {
+                        console.error(`✗ Error inserting into ${tableName}:`, insertError.message);
+                    }
+                } else {
+                    console.warn(`⚠ INSERT command for ${tableName} not found`);
+                }
+            }
+
+            migrationsExecuted = true;
+
+        } catch (migrationError) {
+            console.error('Error running migrations:', migrationError);
+            throw migrationError;
+        } finally {
+            await client.end();
+        }
+    })();
+
+    return migrationPromise;
+};
 
 const connectToDatabase = async () => {
     try {
         await createDbIfNotExists();
+        await runMigrations();
         await sequelize.authenticate();
-    } catch (error) {
-        console.error('Unable to connect to the database:', error);
+    } catch (connectionError) {
+        console.error('Unable to connect to the database:', connectionError);
+        throw connectionError;
     }
 };
 
+const showAllDatabases = async () => {
+    try {
+        await sequelize.query('SELECT datname FROM pg_database WHERE datistemplate = false', { type: sequelize.QueryTypes.SELECT });
+    } catch (dbListError) {
+        console.error('Error fetching databases:', dbListError);
+    }
+};
+
+const resetMigrationState = () => {
+    migrationsExecuted = false;
+    migrationPromise = null;
+};
+
 module.exports = {
-    connectToDatabase,
     sequelize,
+    connectToDatabase,
+    showAllDatabases,
+    runMigrations,
+    resetMigrationState
 };

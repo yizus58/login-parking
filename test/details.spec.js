@@ -9,11 +9,10 @@ app.use(express.json());
 app.use('/api/details', detailsRoute);
 
 beforeAll(async () => {
-    process.env.NODE_ENV = 'test';
     await connectToDatabase();
+    global.token = await getToken();
 
     //await new Promise(resolve => setTimeout(resolve, 1000));
-    global.token = await getToken();
 });
 
 test('GET Earnings By Period', async () => {
