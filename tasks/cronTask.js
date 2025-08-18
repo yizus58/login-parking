@@ -1,6 +1,6 @@
 const { VehiclesOutParking } = require("../controllers/vehiclesLog");
 const logger = require('../utils/logger');
-const { sendPost } = require("../config/http");
+const { notificationEmail } = require("../controllers/request");
 const generateHtmlContent = require("../public/htmlReport");
 
 const executeDailyTask = async () => {
@@ -16,7 +16,7 @@ const executeDailyTask = async () => {
         const htmlContent = generateHtmlContent(vehicle);
 
         try {
-            const send = await sendPost({recipient: email, html: htmlContent, subject: process.env.APP_SUBJECT});
+            const send = await notificationEmail({recipients: email, html: htmlContent, subject: process.env.APP_SUBJECT});
             if (!send.result) {
                 logger.error('Error al enviar correo a socio:', {email, error: send.message});
                 return false;
