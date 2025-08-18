@@ -1,5 +1,6 @@
-const { Post } = require("../config/axios");
+const { Post } = require("../services/axiosService");
 const logger = require("../utils/logger");
+const RabbitMQService = require("../services/rabbitmqService");
 
 const notificationEmail = async (data) => {
     try {

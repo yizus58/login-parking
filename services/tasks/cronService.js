@@ -1,7 +1,7 @@
-const { VehiclesOutParking } = require("../controllers/vehiclesLog");
-const logger = require('../utils/logger');
-const { notificationEmail } = require("../controllers/request");
-const generateHtmlContent = require("../public/htmlReport");
+const { VehiclesOutParking } = require("../../controllers/vehiclesLog");
+const logger = require('../../utils/logger');
+const { notificationEmail } = require("../../controllers/request");
+const generateHtmlContent = require("../../public/htmlReport");
 
 const executeDailyTask = async () => {
     const dataVehicleOutParking = await VehiclesOutParking();

@@ -1,6 +1,6 @@
 const cron = require('node-cron');
 const logger = require('../utils/logger');
-const { executeDailyTask } = require('../tasks/cronTask');
+const { executeDailyTask } = require('../services/tasks/cronService');
 
 function initCronJobs() {
     const cronTimeDelay = process.env.CRON_HOUR_DETERMINATION;

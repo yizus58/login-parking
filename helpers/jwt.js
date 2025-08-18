@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const logger = require("../utils/logger");
 
 const generateJWT = (uid) => {
 
@@ -24,7 +25,7 @@ const checkJWT = (token = '') => {
         return [ true, uid ];
 
     } catch (error) {
-        console.log(error);
+        logger.error(error);
         return [false, null]
     }
 

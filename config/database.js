@@ -74,7 +74,7 @@ const dropExistingTables = async (client) => {
         await client.query('DROP TABLE IF EXISTS users CASCADE');
         await client.query('DROP TYPE IF EXISTS enum_vehicles_status CASCADE');
     } catch (dropError) {
-        logger.log('Tables did not exist, continuing...', dropError);
+        logger.error('Tables did not exist, continuing...', dropError);
     }
 };
 
