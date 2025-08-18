@@ -1,38 +1,17 @@
 const cron = require('node-cron');
-const { VehiclesOutParking } = require("../controllers/vehiclesLog");
 const logger = require('../utils/logger');
-const { sendPost } = require("./http");
-const generateHtmlContent = require("../public/htmlReport");
+const { executeDailyTask } = require('../tasks/cronTask');
 
 function initCronJobs() {
-    console.log('Cron inicializado');
     const cronTimeDelay = process.env.CRON_HOUR_DETERMINATION;
+    logger.info(`Cron job diario inicializado con la hora ${cronTimeDelay}`);
 
     const dailyTask = cron.schedule(cronTimeDelay, async () => {
-        try {
-            const dataVehicleOutParking = await VehiclesOutParking();
+        const task = await executeDailyTask();
 
-            if (Object.values(dataVehicleOutParking).length === 0) {
-                logger.error('No hay vehículos que salieron del parqueadero en la última hora');
-                return;
-            }
-
-            for (const vehicle of Object.values(dataVehicleOutParking)) {
-                const email = vehicle.email_partner;
-                const htmlContent = generateHtmlContent(vehicle);
-
-                try {
-                    const send = await sendPost({recipient: email, html: htmlContent, subject: process.env.APP_SUBJECT});
-                    if (!send.result) {
-                        logger.error('Error al enviar correo a socio:', {email, error: send.message});
-                    }
-                } catch (emailError) {
-                    logger.error('Error al enviar correo:', emailError);
-                }
-            }
-            console.log('Tarea horaria finalizada');
-        } catch (error) {
-            logger.error('Error en la tarea horaria:', error);
+        if (!task) {
+            logger.info('No se pudo ejecutar la tarea diaria');
+            return;
         }
     }, {
         scheduled: true,
