@@ -57,6 +57,111 @@ const sequelize = new Sequelize(dbName, dbUser, dbPassword, {
     }
 });
 
+const checkTablesExist = async (client) => {
+    const tablesExist = await client.query(`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name IN ('users', 'parkings', 'vehicles')
+    `);
+    return tablesExist.rows.length === 3;
+};
+
+const dropExistingTables = async (client) => {
+    try {
+        await client.query('DROP TABLE IF EXISTS vehicles CASCADE');
+        await client.query('DROP TABLE IF EXISTS parkings CASCADE');
+        await client.query('DROP TABLE IF EXISTS users CASCADE');
+        await client.query('DROP TYPE IF EXISTS enum_vehicles_status CASCADE');
+    } catch (dropError) {
+        logger.log('Tables did not exist, continuing...', dropError);
+    }
+};
+
+const parseMigrationFile = (migrationPath) => {
+    if (!fs.existsSync(migrationPath)) {
+        throw new Error(`Migration file not found: ${migrationPath}`);
+    }
+
+    const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+    const cleanSQL = migrationSQL
+        .replace(/--.*$/gm, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const rawCommands = cleanSQL.split(';').filter(cmd => cmd.trim().length > 0);
+    const commands = rawCommands.map(cmd => cmd.trim() + ';');
+
+    return {
+        createTypeCommands: commands.filter(cmd => cmd.toUpperCase().includes('CREATE TYPE')),
+        createTableCommands: commands.filter(cmd => cmd.toUpperCase().includes('CREATE TABLE')),
+        insertCommands: commands.filter(cmd => cmd.toUpperCase().includes('INSERT INTO'))
+    };
+};
+
+const executeCreateTypes = async (client, createTypeCommands) => {
+    for (let i = 0; i < createTypeCommands.length; i++) {
+        const command = createTypeCommands[i];
+        try {
+            await client.query(command);
+        } catch (typeError) {
+            if (typeError.code === '42710') {
+                continue;
+            }
+            console.error(`✗ Error in CREATE TYPE command ${i + 1}:`, typeError.message);
+            throw typeError;
+        }
+    }
+};
+
+const executeCreateTables = async (client, createTableCommands) => {
+    const tableOrder = ['users', 'parkings', 'vehicles'];
+
+    for (const tableName of tableOrder) {
+        const tableCommand = createTableCommands.find(cmd =>
+            cmd.toUpperCase().includes(`CREATE TABLE PUBLIC.${tableName.toUpperCase()}`)
+        );
+
+        if (tableCommand) {
+            try {
+                await client.query(tableCommand);
+            } catch (tableError) {
+                if (tableError.code === '42P07') {
+                    continue;
+                }
+                console.error(`✗ Error creating table ${tableName}:`, tableError.message);
+                throw tableError;
+            }
+        } else {
+            console.warn(`⚠ CREATE TABLE command for ${tableName} not found`);
+        }
+    }
+};
+
+const executeInserts = async (client, insertCommands) => {
+    const tableOrder = ['users', 'parkings', 'vehicles'];
+
+    for (const tableName of tableOrder) {
+        const insertCommand = insertCommands.find(cmd =>
+            cmd.toUpperCase().includes(`INSERT INTO PUBLIC.${tableName.toUpperCase()}`)
+        );
+
+        if (insertCommand) {
+            try {
+                const existingData = await client.query(`SELECT COUNT(*) FROM ${tableName}`);
+                if (parseInt(existingData.rows[0].count) > 0) {
+                    continue;
+                }
+                await client.query(insertCommand);
+            } catch (insertError) {
+                console.error(`✗ Error inserting into ${tableName}:`, insertError.message);
+            }
+        } else {
+            console.warn(`⚠ INSERT command for ${tableName} not found`);
+        }
+    }
+};
+
 const runMigrations = async () => {
 
     if (migrationsExecuted) {
@@ -83,101 +188,19 @@ const runMigrations = async () => {
         try {
             await client.connect();
 
-            const tablesExist = await client.query(`
-                SELECT table_name 
-                FROM information_schema.tables 
-                WHERE table_schema = 'public' 
-                AND table_name IN ('users', 'parkings', 'vehicles')
-            `);
-
-            if (tablesExist.rows.length === 3) {
+            if (await checkTablesExist(client)) {
                 migrationsExecuted = true;
                 return;
             }
 
-            try {
-                await client.query('DROP TABLE IF EXISTS vehicles CASCADE');
-                await client.query('DROP TABLE IF EXISTS parkings CASCADE');
-                await client.query('DROP TABLE IF EXISTS users CASCADE');
-                await client.query('DROP TYPE IF EXISTS enum_vehicles_status CASCADE');
-            } catch (dropError) {
-                logger.log('Tables did not exist, continuing...', dropError);
-            }
+            await dropExistingTables(client);
 
             const migrationPath = path.join(__dirname, '..', 'migrations', 'database.sql');
+            const { createTypeCommands, createTableCommands, insertCommands } = parseMigrationFile(migrationPath);
 
-            if (!fs.existsSync(migrationPath)) {
-                throw new Error(`Migration file not found: ${migrationPath}`);
-            }
-
-            const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
-
-            const cleanSQL = migrationSQL
-                .replace(/--.*$/gm, '')
-                .replace(/\s+/g, ' ')
-                .trim();
-
-            const rawCommands = cleanSQL.split(';').filter(cmd => cmd.trim().length > 0);
-            const commands = rawCommands.map(cmd => cmd.trim() + ';');
-
-            const createTypeCommands = commands.filter(cmd => cmd.toUpperCase().includes('CREATE TYPE'));
-            const createTableCommands = commands.filter(cmd => cmd.toUpperCase().includes('CREATE TABLE'));
-            const insertCommands = commands.filter(cmd => cmd.toUpperCase().includes('INSERT INTO'));
-
-            for (let i = 0; i < createTypeCommands.length; i++) {
-                const command = createTypeCommands[i];
-                try {
-                    await client.query(command);
-                } catch (typeError) {
-
-                    if (typeError.code === '42710') {
-                        continue;
-                    }
-                    console.error(`✗ Error in CREATE TYPE command ${i + 1}:`, typeError.message);
-                    throw typeError;
-                }
-            }
-
-            const tableOrder = ['users', 'parkings', 'vehicles'];
-            for (const tableName of tableOrder) {
-                const tableCommand = createTableCommands.find(cmd =>
-                    cmd.toUpperCase().includes(`CREATE TABLE PUBLIC.${tableName.toUpperCase()}`)
-                );
-                if (tableCommand) {
-                    try {
-                        await client.query(tableCommand);
-                    } catch (tableError) {
-                        if (tableError.code === '42P07') {
-                            continue;
-                        }
-                        console.error(`✗ Error creating table ${tableName}:`, tableError.message);
-                        throw tableError;
-                    }
-                } else {
-                    console.warn(`⚠ CREATE TABLE command for ${tableName} not found`);
-                }
-            }
-
-            for (const tableName of tableOrder) {
-                const insertCommand = insertCommands.find(cmd =>
-                    cmd.toUpperCase().includes(`INSERT INTO PUBLIC.${tableName.toUpperCase()}`)
-                );
-                if (insertCommand) {
-                    try {
-
-                        const existingData = await client.query(`SELECT COUNT(*) FROM ${tableName}`);
-                        if (parseInt(existingData.rows[0].count) > 0) {
-                            continue;
-                        }
-
-                        await client.query(insertCommand);
-                    } catch (insertError) {
-                        console.error(`✗ Error inserting into ${tableName}:`, insertError.message);
-                    }
-                } else {
-                    console.warn(`⚠ INSERT command for ${tableName} not found`);
-                }
-            }
+            await executeCreateTypes(client, createTypeCommands);
+            await executeCreateTables(client, createTableCommands);
+            await executeInserts(client, insertCommands);
 
             migrationsExecuted = true;
 

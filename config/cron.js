@@ -11,7 +11,7 @@ function initCronJobs() {
 
         if (!task) {
             logger.info('No se pudo ejecutar la tarea diaria');
-            return;
+            return null;
         }
     }, {
         scheduled: true,
