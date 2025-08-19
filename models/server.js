@@ -5,6 +5,7 @@ const { connectToDatabase } = require('../config/database');
 require('../models/associations');
 const initCronJobs = require("../config/cron");
 const {ensureAdminSeed} = require("../controllers/auth");
+const RabbitMQService = require("../services/rabbitmqService");
 
 class Server {
     constructor() {
@@ -46,6 +47,7 @@ class Server {
         try {
             await connectToDatabase();
             await ensureAdminSeed();
+            await RabbitMQService.connect()
             this.app.listen(this.port, () => {
                 console.log(`Server is running on port ${this.port}`);
             });
