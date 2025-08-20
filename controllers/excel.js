@@ -8,9 +8,10 @@ const User = require('../models/User');
 const Vehicle = require("../models/Vehicle");
 const logger = require("../utils/logger");
 const { generarExcelPorUsuario } = require("../utils/excel");
+const {uploadFile, deleteFile} = require("../controllers/cloudflare");
 
 
-function formateaFecha(date) {
+function formateaFecha(date, onlyTime = false) {
     const d = new Date(date);
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -18,7 +19,9 @@ function formateaFecha(date) {
     const hour = String(d.getHours()).padStart(2, '0');
     const minutes = String(d.getMinutes()).padStart(2, '0');
 
-    return `${day}-${month}-${year}-${hour}:${minutes}`;
+    return onlyTime
+        ? `${day}-${month}-${year}`
+        : `${day}-${month}-${year}-${hour}:${minutes}`;
 }
 
 
@@ -32,32 +35,56 @@ const generateExcel = async (req, res = response) => {
 
     const buffer = await generarExcelPorUsuario(data);
 
-    const safeName = (data.parking || "reporte").toString().replace(/[^\w\-]+/g, "_").substring(0, 50);
-    const filename = `reporte_${safeName}.xlsx`;
-
-    const desktopPath = path.join(os.homedir(), 'Desktop');
-    const filePath = path.join(desktopPath, filename);
-
     try {
-        fs.writeFileSync(filePath, buffer);
-        logger.info(`Archivo Excel guardado en: ${filePath}`);
+        const safeName = (data.parking || "reporte").toString().replace(/[^\w\-]+/g, "_").substring(0, 50);
+        const date = formateaFecha(new Date(), true);
+        let filename = 'reporte_'+safeName+'_'+date+'.xlsx';
+        filename = filename.toLowerCase();
+        const contentType = process.env.MIME_TYPE_EXCEL || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
-        res.set({
-            "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "Content-Disposition": `attachment; filename="${filename}"`,
-            "Content-Length": buffer.length
-        });
+        const cfResult = await uploadFile(buffer, contentType, filename);
 
         return res.status(200).json({
             status: true,
-            message: "Se guardo el archivo Excel en el escritorio."
+            message: "Reporte generado y subido a Cloudflare correctamente.",
+            cloudflare: {
+                url: cfResult?.url || null,
+                key: cfResult?.key || null
+            }
         });
-
     } catch (error) {
         logger.error('Error al guardar el archivo Excel:', error);
         return res.status(500).json({
             status: 500,
             message: "Error al guardar el archivo Excel en el escritorio."
+        });
+    }
+}
+
+const removeExcelS3 = async (req, res = response) => {
+    try {
+        const { nameFile } = req.body;
+
+        if (!nameFile) {
+            return res.status(400).json({
+                status: false,
+                message: "El nombre del archivo es requerido."
+            });
+        }
+
+        await deleteFile(nameFile);
+
+        return res.status(200).json({
+            status: true,
+            message: "Archivo eliminado correctamente de Cloudflare R2."
+        });
+
+    } catch (error) {
+        logger.error('Error al eliminar el archivo de Cloudflare R2:', error);
+        return res.status(500).json({
+            status: false,
+            message: "Error al eliminar el archivo de Cloudflare R2.",
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 }
@@ -121,4 +148,4 @@ const getDetailParking = async (id, id_user) => {
     }
 }
 
-module.exports = { generateExcel };
+module.exports = { generateExcel, removeExcelS3 };
