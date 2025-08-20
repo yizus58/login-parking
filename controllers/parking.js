@@ -240,7 +240,7 @@ const getDetailParking = async (req, res = response) => {
             }]
         });
 
-        if (!parkings) {
+        if (!parkings || parkings.length === 0) {
             return res.status(404).json({
                 result: false,
                 msg: 'Parqueadero no encontrado'

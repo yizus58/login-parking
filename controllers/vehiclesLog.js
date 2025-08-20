@@ -163,7 +163,8 @@ const ExitVehicle = async (req, res = response) => {
         const timeDifference = Math.abs(exitTime - entryTime);
         const minutesParked = Math.floor(timeDifference / (1000 * 60));
 
-        const totalCost = Math.ceil(minutesParked / 60) * costParking;
+        const hoursParked = Math.ceil(minutesParked / 60);
+        const totalCost = hoursParked * costParking;
 
         vehicleEntry.exit_time = exitTime;
         await Vehicle.update(
@@ -420,7 +421,8 @@ const getEarningsByPeriod = async (req, res = response) => {
             const timeDifference = Math.abs(exitTime - entryTime);
             const minutesParked = Math.floor(timeDifference / (1000 * 60));
 
-            const totalCost = Math.ceil((minutesParked / 60) * vehicle.cost_per_hour);
+            const hoursParked = Math.ceil(minutesParked / 60);
+            const totalCost = hoursParked * vehicle.cost_per_hour;
 
             totalEarnings += totalCost;
         });
@@ -667,7 +669,8 @@ const getTopParkingsEarningsCurrentWeek = async (req, res = response) => {
             const timeDifference = Math.abs(exitTime - entryTime);
             const minutesParked = Math.floor(timeDifference / (1000 * 60));
 
-            const totalCost = Math.ceil((minutesParked / 60) * costPerHour);
+            const hoursParked = Math.ceil(minutesParked / 60);
+            const totalCost = hoursParked * costPerHour;
 
             if (!parkingEarnings[parkingId]) {
                 parkingEarnings[parkingId] = {

@@ -2,7 +2,7 @@ const request = require('supertest');
 const express = require('express');
 const detailsRoute = require('../routes/detailRoutes');
 const { connectToDatabase, sequelize } = require('../config/database');
-const { getToken } =require('../utils/testUtils');
+const { getToken, getTokenUser } =require('../utils/testUtils');
 
 const app = express();
 app.use(express.json());
@@ -23,8 +23,8 @@ afterAll(async () => {
 test('GET Earnings By Period', async () => {
     const data = {
         id_parking: 1,
-        start_date: '08-08-2025',
-        end_date: '15-08-2025'
+        start_date: '10-08-2025',
+        end_date: '25-08-2025'
     };
 
     const response = await request(app)
@@ -32,7 +32,15 @@ test('GET Earnings By Period', async () => {
         .send(data)
         .set('Authorization', `Bearer ${global.token}`);
 
-    //expect(response.body.result).toBe(true);
-    //expect(response.body).toHaveProperty('message', 'Get earnings by determination period')
+   expect(response.body.result).toBe(true);
+});
+
+test(' GET Details By ID', async () => {
+    let token = await getTokenUser(false);
+    const response = await request(app)
+        .get('/api/details/1')
+        .set('Authorization', `Bearer ${token}`);
+
+   expect(response.body.result).toBe(true);
 });
 
