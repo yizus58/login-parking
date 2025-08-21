@@ -17,12 +17,13 @@ async function generarExcelPorUsuario(data, opts = {}) {
     for (const item of items) {
         const sheetName = (item.username || "usuario").substring(0, 31);
         const ws = workbook.addWorksheet(sheetName);
+        let name_parking = item.parking.toLowerCase() || "";
 
         const headerStyle = { bold: true };
         const currencyFmt = '"$"#,##0.00;[Red]-"$"#,##0.00';
 
         ws.mergeCells("A1:E1");
-        ws.getCell("A1").value = `Usuario: ${item.username || ""}  |  Parqueadero a cargo: ${item.parking || ""}`;
+        ws.getCell("A1").value = `Usuario: ${item.username || ""}  |  Parqueadero a cargo: ${name_parking || ""}`;
         ws.getCell("A1").font = { bold: true, size: 12 };
 
         ws.addRow([]);
@@ -64,7 +65,9 @@ async function generarExcelPorUsuario(data, opts = {}) {
         const finDatos = rowIndex - 1;
         if (finDatos >= inicioDatos) {
             ws.addRow([]);
-            const subtotalRow = ws.addRow(["", "", "", "Subtotal:", { formula: `SUM(E${inicioDatos}:E${finDatos})` }]);
+            const subtotalValue = item.total_earnings;
+
+            const subtotalRow = ws.addRow(["", "", "", "Subtotal:", subtotalValue || { formula: `SUM(E${inicioDatos}:E${finDatos})` }]);
             subtotalRow.getCell(5).numFmt = currencyFmt;
             subtotalRow.font = { bold: true };
         } else {

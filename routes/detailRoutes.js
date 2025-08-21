@@ -3,7 +3,7 @@ const { validateEarningPeriod, validateIdParams } = require('../middlewares/vali
 const { validateJWT } = require('../middlewares/validate-jwt');
 const { getDetailParking } = require("../controllers/parking");
 const { getEarningsByPeriod } = require("../controllers/vehiclesLog");
-const { generateExcel, removeExcelS3 } = require("../controllers/excel");
+const { generateExcel, removeExcelS3 } = require("../controllers/reportExcel");
 
 const router = Router();
 

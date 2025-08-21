@@ -1,5 +1,4 @@
 const {DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client} = require("@aws-sdk/client-s3");
-const {getSignedUrl} = require("@aws-sdk/s3-request-presigner");
 const crypto = require('crypto');
 require('dotenv').config();
 
@@ -13,43 +12,50 @@ const r2 = new S3Client({
     forcePathStyle: true,
 });
 
-async function uploadFile(buffer, contentType, nameFile) {
-    let fileName = !nameFile ? crypto.randomBytes(16).toString('hex') : nameFile;
+async function uploadFile(buffer, contentType, fileName) {
+
+    await getFile(fileName);
+
+    try {
+        const command = new PutObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME,
+            Key: fileName,
+            Body: buffer,
+            ContentType: contentType
+        });
+
+        await r2.send(command);
+
+        return {Key: fileName};
+    } catch (error) {
+        console.error(`Error uploading file "${fileName}": ${error.message}`);
+        throw error;
+    }
+}
+
+async function getFile (filename) {
     try {
         const commandFind = new GetObjectCommand({
             Bucket: process.env.R2_BUCKET_NAME,
-            Key: fileName,
+            Key: filename,
         });
 
         await r2.send(commandFind);
 
-        console.log(`File "${fileName}" already exists in the bucket.`);
+        console.log(`File "${filename}" already exists in the bucket.`);
         return {
-            url: `${process.env.R2_BUCKET_PATH}/${fileName}`,
-            key: fileName,
+            key: filename,
             exists: true
         };
 
     } catch (error) {
         if (error.name === 'NoSuchKey') {
-            console.log(`File "${fileName}" does not exist. Proceeding with upload.`);
+            console.log(`File "${filename}" does not exist. Proceeding with upload.`);
         } else {
             console.warn(`Error checking file existence: ${error.message}`);
+            throw error;
         }
     }
-
-    const command = new PutObjectCommand({
-        Bucket: process.env.R2_BUCKET_NAME,
-        Key: fileName,
-        Body: buffer,
-        ContentType: contentType
-    });
-
-    await r2.send(command);
-
-    const url = `${process.env.R2_BUCKET_PATH}/${fileName}`;
-
-    return {url: url, key: fileName};
 }
 
 const deleteFile = async (filename) => {

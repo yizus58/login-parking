@@ -11,6 +11,19 @@ require('../models/associations');
 const idAdmin = Number(process.env.ID_ADMIN);
 const idError = 3;
 
+function formateaFecha(date, onlyTime = false) {
+    const d = new Date(date);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hour = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+
+    return onlyTime
+        ? `${day}-${month}-${year}`
+        : `${day}-${month}-${year}-${hour}:${minutes}`;
+}
+
 const getCurrentWeekDates = () => {
     const currentTime = new Date();
     const now = new Date(currentTime.getTime() - (currentTime.getTimezoneOffset() * 60000));
@@ -531,6 +544,96 @@ const getVehiclesOut = async () => {
         }));
 }
 
+const getVehiclesOutDetails = async () => {
+    const startOfDay = new Date();
+    startOfDay.setUTCHours(0, 0, 0, 0); // Establece la hora a las 00:00:00 UTC
+
+    const endOfDay = new Date();
+    endOfDay.setUTCHours(23, 59, 59, 999); // Establece la hora a las 23:59:59 UTC
+
+    const findVehiclesOut = await Vehicle.findAll({
+        attributes: [
+            'id',
+            'id_parking',
+            'model_vehicle',
+            'plate_number',
+            'entry_time',
+            'exit_time',
+            'cost_per_hour',
+            'id_admin'
+        ],
+        include: [
+            {
+                model: Parking,
+                attributes: ['name']
+            },
+            {
+                model: User,
+                as: 'admin',
+                attributes: ['id', 'username', 'email'] // <= antes 'user_name'
+            }
+        ],
+        where: {
+            exit_time: {
+                [Op.gte]: startOfDay,
+                [Op.lte]: endOfDay
+            },
+            status: 'OUT'
+        },
+        raw: true,
+        nest: true
+    });
+
+    const parkingEarnings = {};
+
+    findVehiclesOut.forEach(vehicle => {
+        const vehicleId = vehicle.id;
+        const parkingId = vehicle.id_parking;
+        const parkingName = vehicle.Parking?.name;
+        const costPerHour = Number(vehicle.cost_per_hour) || 0;
+        const plate_number = vehicle.plate_number;
+        const model_vehicle = vehicle.model_vehicle;
+        const userId = vehicle.admin?.id;
+
+
+        const entryTime = new Date(vehicle.entry_time);
+        const exitTime = new Date(vehicle.exit_time);
+        const timeDifference = Math.abs(exitTime - entryTime);
+        const minutesParked = Math.floor(timeDifference / (1000 * 60));
+
+        const hoursParked = Math.ceil(minutesParked / 60);
+        const totalCost = hoursParked * costPerHour;
+        const day = formateaFecha(exitTime);
+
+        if (!parkingEarnings[userId]) {
+            parkingEarnings[userId] = {
+                id: userId,
+                username: vehicle.admin?.username, // <= antes user_name
+                email: vehicle.admin?.email,
+            }
+        }
+
+        if (!parkingEarnings[userId][parkingId]) {
+            parkingEarnings[userId][parkingId] = {
+                id: parkingId,
+                name: parkingName
+            };
+        }
+
+        if (!parkingEarnings[userId][parkingId][vehicleId]) {
+            parkingEarnings[userId][parkingId][vehicleId] = {
+                vehicle_id: vehicleId,
+                plate_number,
+                model_vehicle,
+                day,
+                total_cost: totalCost
+            }
+        }
+    });
+
+    return parkingEarnings;
+}
+
 
 const VehiclesOutParking = async () => {
     const allVehicles = await getVehiclesOut();
@@ -565,6 +668,48 @@ const VehiclesOutParking = async () => {
         }
     }
     return infoParking;
+}
+
+const VehiclesOutDetails = async () => {
+    const allVehicles = await getVehiclesOutDetails();
+
+    const flattenedData = [];
+
+    Object.keys(allVehicles).forEach(userId => {
+        const user = allVehicles[userId];
+
+        Object.keys(user).forEach(key => {
+            if (key !== 'id' && key !== 'username' && key !== 'email') {
+                const parkingId = key;
+                const parking = user[parkingId];
+
+                const vehicles = [];
+                Object.keys(parking).forEach(vehicleKey => {
+                    if (vehicleKey !== 'id' && vehicleKey !== 'name') {
+                        vehicles.push(parking[vehicleKey]);
+                    }
+                });
+
+                vehicles.sort((a, b) => b.total_cost - a.total_cost);
+
+                flattenedData.push({
+                    user_id: user.id,
+                    username: user.username,
+                    email: user.email,
+                    parking_id: parking.id,
+                    parking: parking.name,
+                    vehicles: vehicles,
+                    total_vehicles: vehicles.length,
+                    total_earnings: vehicles.reduce((sum, vehicle) => sum + vehicle.total_cost, 0)
+                });
+            }
+        });
+    });
+
+    // Sort by total earnings (highest first)
+    flattenedData.sort((a, b) => b.total_earnings - a.total_earnings);
+
+    return flattenedData;
 }
 
 const getTopPartnersCurrentWeek = async (req, res = response) => {
@@ -720,5 +865,7 @@ module.exports = {
     getTopPartnersCurrentWeek,
     getTopParkingsEarningsCurrentWeek,
     getTopVehiclesByParking,
-    VehiclesOutParking
+    VehiclesOutParking,
+    VehiclesOutDetails,
+    formateaFecha
 }
