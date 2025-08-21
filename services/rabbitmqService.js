@@ -34,7 +34,6 @@ class RabbitMQService {
         if (!this.channel) {
             throw new Error('No channel available for publishing');
         }
-
         await this.channel.sendToQueue(this.queue, Buffer.from(JSON.stringify(message)), {
             persistent: true
         });

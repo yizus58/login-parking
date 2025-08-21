@@ -41,17 +41,13 @@ async function getFile (filename) {
         });
 
         await r2.send(commandFind);
-
-        console.log(`File "${filename}" already exists in the bucket.`);
         return {
             key: filename,
             exists: true
         };
 
     } catch (error) {
-        if (error.name === 'NoSuchKey') {
-            console.log(`File "${filename}" does not exist. Proceeding with upload.`);
-        } else {
+        if (error.name !== 'NoSuchKey') {
             console.warn(`Error checking file existence: ${error.message}`);
             throw error;
         }

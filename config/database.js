@@ -108,7 +108,7 @@ const executeCreateTypes = async (client, createTypeCommands) => {
             if (typeError.code === '42710') {
                 continue;
             }
-            console.error(`✗ Error in CREATE TYPE command ${i + 1}:`, typeError.message);
+            logger.error(`✗ Error in CREATE TYPE command ${i + 1}:`, typeError.message);
             throw typeError;
         }
     }
@@ -129,7 +129,7 @@ const executeCreateTables = async (client, createTableCommands) => {
                 if (tableError.code === '42P07') {
                     continue;
                 }
-                console.error(`✗ Error creating table ${tableName}:`, tableError.message);
+                logger.error(`✗ Error creating table ${tableName}:`, tableError.message);
                 throw tableError;
             }
         } else {
@@ -154,7 +154,7 @@ const executeInserts = async (client, insertCommands) => {
                 }
                 await client.query(insertCommand);
             } catch (insertError) {
-                console.error(`✗ Error inserting into ${tableName}:`, insertError.message);
+                logger.error(`✗ Error inserting into ${tableName}:`, insertError.message);
             }
         } else {
             console.warn(`⚠ INSERT command for ${tableName} not found`);
@@ -205,7 +205,7 @@ const runMigrations = async () => {
             migrationsExecuted = true;
 
         } catch (migrationError) {
-            console.error('Error running migrations:', migrationError);
+            logger.error('Error running migrations:', migrationError);
             throw migrationError;
         } finally {
             await client.end();
@@ -221,7 +221,7 @@ const connectToDatabase = async () => {
         await runMigrations();
         await sequelize.authenticate();
     } catch (connectionError) {
-        console.error('Unable to connect to the database:', connectionError);
+        logger.error('Unable to connect to the database:', connectionError);
         throw connectionError;
     }
 };
@@ -230,7 +230,7 @@ const showAllDatabases = async () => {
     try {
         await sequelize.query('SELECT datname FROM pg_database WHERE datistemplate = false', { type: sequelize.QueryTypes.SELECT });
     } catch (dbListError) {
-        console.error('Error fetching databases:', dbListError);
+        logger.error('Error fetching databases:', dbListError);
     }
 };
 

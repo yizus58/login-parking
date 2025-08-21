@@ -41,7 +41,8 @@ async function RabbitMQPublisherBackoff(params) {
                 userId: base.userId ?? id,
                 recipients: base.recipients,
                 subject: base.subject,
-                html: base.html
+                html: base.html,
+                ...(base.attachments && { attachments: base.attachments })
             },
             timestamp: new Date().toISOString()
         };

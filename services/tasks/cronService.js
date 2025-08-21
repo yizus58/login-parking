@@ -63,7 +63,7 @@ const executeReportTask = async () => {
 
             const email = data_v.email;
             const html = htmlContentFile(data_v, filename);
-            const data = { recipients: email, html: html, subject: process.env.APP_SUBJECT, name_file: filename, s3_name: nameS3 };
+            const data = { recipients: email, html: html, subject: process.env.APP_SUBJECT, attachments: {name_file: filename, s3_name: nameS3} };
 
             await uploadFile(buffer, contentType, nameS3);
 

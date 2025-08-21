@@ -20,8 +20,7 @@ function initCronJobs() {
     });
 
 
-    cron.schedule(cronReport, async () => {
-        console.log('Tarea de reporte ejecutandose cada minuto');
+    cron.schedule(cronTimeDelay, async () => {
         const report = await executeReportTask();
         if (!report) {
             logger.info('No se pudo ejecutar la tarea diaria');

@@ -55,7 +55,7 @@ const htmlContentFile = (vehicle) => `
                 <tr>
                     <td style="font-size:16px; color:#333; line-height:1.5; padding-bottom:20px;">
                         Hola <b>${vehicle.username},</b><br><br>
-                        En la última hora ha habido un total de ${vehicle.total_vehicles} vehículos en
+                        En la última hora ha habido un total de <b>${vehicle.total_vehicles}</b> vehículos en
                         <b>${vehicle.parking}</b>.<br>
                         Puede consultar tanto el resumen como el detalle de los movimientos directamente en el archivo Excel.
                     </td>
