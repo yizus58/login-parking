@@ -6,10 +6,10 @@ WORKDIR /app
 # Copiar package.json y package-lock.json
 COPY package*.json ./
 
-# Instalar solo dependencias de producción
-RUN npm ci --only=production
+# Instalar TODAS las dependencias, incluyendo devDependencies para testing
+RUN npm ci
 
-# Copiar el código fuente
+# Copiar el código fuente (aunque será sobreescrito por el volumen en modo dev)
 COPY . .
 
 # Crear usuario no root para seguridad
@@ -23,5 +23,5 @@ USER nodejs
 # Exponer el puerto
 EXPOSE 3000
 
-# Comando para iniciar la aplicación
+# El comando por defecto. Será sobreescrito en docker-compose.dev.yml
 CMD ["node", "app.js"]
