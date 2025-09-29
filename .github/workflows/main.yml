@@ -11,18 +11,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '20'
+    - name: Create .env file
+      run: |
+        echo "JWT_KEY=${{ secrets.JWT_KEY }}" >> .env
+        echo "ADMIN_EMAIL=admin@test.com" >> .env
+        echo "ADMIN_PASSWORD=password" >> .env
+        echo "TEST_USER_EMAIL=user@test.com" >> .env
+        echo "TEST_USER_PASSWORD=password" >> .env
 
-    - name: Install dependencies
-      run: npm install
-
-    - name: Run tests
-      run: npm test
+    - name: Run tests with Docker Compose
+      run: docker-compose -f docker-compose.dev.yml up --build --abort-on-container-exit
 
   build-and-push-docker:
     needs: build-and-test
@@ -45,12 +46,3 @@ jobs:
         context: .
         push: true
         tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
-
-#  deploy:
-#    needs: build-and-push-docker
-#    runs-on: ubuntu-latest
-#    if: github.ref == 'refs/heads/main' # Solo se ejecuta en pushes a master
-#
-#    steps:
-#    - name: Deploy to production
-#      run: |
