@@ -68,6 +68,7 @@ class RabbitMQService {
 
             if (!this.isConnectionOpen()) {
                 const rabbitmqUrl = process.env.RABBITMQ_URL;
+                logger.info(`Attempting to connect to RabbitMQ with URL: ${rabbitmqUrl}`);
                 this.connection = await amqp.connect(rabbitmqUrl);
 
                 this.connection.on('error', (err) => {

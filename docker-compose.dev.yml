@@ -12,7 +12,7 @@ services:
       - DB_PASSWORD=password
       - DB_NAME=login_parking_dev
       - PORT=3000
-      - JWT_KEY=your_jwt_secret_key_here
+      - JWT_KEY=${JWT_KEY}
     depends_on:
       postgres:
         condition: service_healthy
