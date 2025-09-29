@@ -2,7 +2,7 @@ const request = require('supertest');
 const express = require('express');
 const authRoutes = require('../routes/authRoutes');
 const { connectToDatabase, sequelize} = require('../config/database');
-const { createUser } = require("../utils/testUtils");
+const { getAuth } = require("../utils/testUtils");
 
 const app = express();
 app.use(express.json());
@@ -10,7 +10,6 @@ app.use('/api/auth', authRoutes);
 
 beforeAll(async () => {
     await connectToDatabase();
-    await createUser(process.env.ADMIN_EMAIL, process.env.ADMIN_PASSWORD);
 });
 
 afterAll(async () => {
@@ -19,29 +18,51 @@ afterAll(async () => {
     }
 });
 
+describe('Auth API', () => {
+    let auth;
 
-test('POST /login', async () => {
-    const user = {
-        email: 'admin@mail.com',
-        password: 'admin',
-    };
+    beforeAll(async () => {
+        auth = await getAuth(true);
+    });
 
-    const response = await request(app)
-        .post('/api/auth/')
-        .send(user)
-        .expect(200);
+    test('POST /login with correct credentials', async () => {
+        const user = {
+            email: process.env.ADMIN_EMAIL,
+            password: process.env.ADMIN_PASSWORD,
+        };
 
-    global.token = response.body.token;
+        const response = await request(app)
+            .post('/api/auth/')
+            .send(user)
+            .expect(200);
 
-    expect(response.body).toHaveProperty('token');
-}, 10000);
+        expect(response.body.result).toBe(true);
+        expect(response.body).toHaveProperty('token');
+        expect(response.body.data.email).toBe(process.env.ADMIN_EMAIL);
+    });
 
-test('GET /renew token', async () => {
-    const response = await request(app)
-       .get('/api/auth/renew')
-       .set('Authorization', `Bearer ${global.token}`)
-       .expect(200);
-    global.tokenAdmin = response.body.token;
+    test('POST /login with incorrect credentials', async () => {
+        const user = {
+            email: process.env.ADMIN_EMAIL,
+            password: 'wrongpassword',
+        };
 
-    expect(response.body).toHaveProperty('token');
+        const response = await request(app)
+            .post('/api/auth/')
+            .send(user)
+            .expect(404);
+
+        expect(response.body.result).toBe(false);
+    });
+
+    test('GET /renew token', async () => {
+        const response = await request(app)
+           .get('/api/auth/renew')
+           .set('Authorization', `Bearer ${auth.token}`)
+           .expect(200);
+
+        expect(response.body.result).toBe(true);
+        expect(response.body).toHaveProperty('token');
+        expect(response.body.data.email).toBe(process.env.ADMIN_EMAIL);
+    });
 });

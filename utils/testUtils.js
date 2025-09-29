@@ -2,56 +2,72 @@ const request = require('supertest');
 const authRoutes = require('../routes/authRoutes');
 const express = require("express");
 const User = require('../models/User');
+const Parking = require('../models/Parking');
 const bcrypt = require('bcryptjs');
-const logger = require("./logger");
 
 const app = express();
 app.use(express.json());
 app.use('/api/auth', authRoutes);
 
-let mail = process.env.ADMIN_EMAIL;
-let pass = process.env.ADMIN_PASSWORD;
+async function getAuth(admin = true) {
+    const email = admin ? process.env.ADMIN_EMAIL : process.env.TEST_USER_EMAIL;
+    const password = admin ? process.env.ADMIN_PASSWORD : process.env.TEST_USER_PASSWORD;
+    const role = admin ? 'ADMIN' : 'SOCIO';
 
-let token = null;
+    const user = await createUser(email, password, role);
 
-async function getToken(admin = true) {
-    if (!token) {
-        if (!admin) {
-            mail = process.env.TEST_USER_EMAIL;
-            pass = process.env.TEST_USER_PASSWORD;
-            await createTestUser();
-        }
+    const response = await request(app)
+        .post('/api/auth/')
+        .send({ email, password });
+    const token = response.body.token;
 
-        const response = await request(app)
-            .post('/api/auth/')
-            .send({email: mail, password: pass});
-        token = response.body.token;
-    }
-    return token;
+    return { token, user };
 }
 
 const createUser = async (mail, pass, rol = 'ADMIN') => {
     await User.sequelize.sync();
-    const username = rol === 'ADMIN' ? 'admin' : 'jdoe';
-    let id = null;
 
-    const findUser = await User.findOne({where: {email: mail}});
-    if (!findUser) {
+    return User.sequelize.transaction(async (t) => {
         const salt = await bcrypt.genSalt();
         const hashedPassword = await bcrypt.hash(pass, salt);
-        const save = await User.create({
-            username: username,
+
+        const where = rol === 'ADMIN' ? { username: 'admin' } : { email: mail };
+        const defaults = {
+            username: rol === 'ADMIN' ? 'admin' : `jdoe_${Date.now()}`,
             email: mail,
             password: hashedPassword,
             role: rol
+        };
+
+        const [user, created] = await User.findOrCreate({
+            where,
+            defaults,
+            transaction: t
         });
-        id = save.id;
-    }
-    return findUser !== null ? findUser.id : id;
+
+        if (!created) {
+            await User.update(
+                { password: hashedPassword, role: rol, email: mail },
+                { where: { id: user.id }, transaction: t }
+            );
+        }
+        
+        await user.reload({ transaction: t });
+        return user;
+    });
+};
+
+
+const createParking = async (partnerId) => {
+    await Parking.sequelize.sync();
+    const parking = await Parking.create({
+        name: `Test Parking ${Date.now()}`,
+        address: "123 Test St",
+        capacity: 100,
+        cost_per_hour: 10,
+        id_partner: partnerId
+    });
+    return parking;
 }
 
-const createTestUser = async () => {
-    await createUser(process.env.TEST_USER_EMAIL, process.env.TEST_USER_PASSWORD, 'SOCIO');
-}
-
-module.exports = {getToken, createUser};
+module.exports = { getAuth, createUser, createParking };

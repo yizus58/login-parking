@@ -2,15 +2,17 @@ const request = require('supertest');
 const express = require('express');
 const detailsRoute = require('../routes/detailRoutes');
 const { connectToDatabase, sequelize } = require('../config/database');
-const { getToken, getTokenUser } =require('../utils/testUtils');
+const { getAuth, createParking } = require('../utils/testUtils');
 
 const app = express();
 app.use(express.json());
 app.use('/api/details', detailsRoute);
 
+let auth;
+
 beforeAll(async () => {
     await connectToDatabase();
-    global.token = await getToken();
+    auth = await getAuth(false);
 });
 
 afterAll(async () => {
@@ -19,28 +21,33 @@ afterAll(async () => {
     }
 });
 
+describe('Details API', () => {
+    let testParking;
 
-test('GET Earnings By Period', async () => {
-    const data = {
-        id_parking: 1,
-        start_date: '10-08-2025',
-        end_date: '25-08-2025'
-    };
+    beforeEach(async () => {
+        testParking = await createParking(auth.user.id);
+    });
 
-    const response = await request(app)
-        .get('/api/details/')
-        .send(data)
-        .set('Authorization', `Bearer ${global.token}`);
+    test('GET Earnings By Period', async () => {
+        const data = {
+            id_parking: testParking.id,
+            start_date: '10-08-2025',
+            end_date: '25-08-2025'
+        };
 
-   expect(response.body.result).toBe(true);
+        const response = await request(app)
+            .get('/api/details/')
+            .query(data)
+            .set('Authorization', `Bearer ${auth.token}`);
+
+        expect(response.body.result).toBe(true);
+    });
+
+    test('GET Details By ID', async () => {
+        const response = await request(app)
+            .get(`/api/details/${testParking.id}`)
+            .set('Authorization', `Bearer ${auth.token}`);
+
+        expect(response.body.result).toBe(true);
+    });
 });
-
-test(' GET Details By ID', async () => {
-    let token = await getTokenUser(false);
-    const response = await request(app)
-        .get('/api/details/1')
-        .set('Authorization', `Bearer ${token}`);
-
-   expect(response.body.result).toBe(true);
-});
-

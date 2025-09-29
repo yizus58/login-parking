@@ -2,17 +2,19 @@ const request = require('supertest');
 const express = require('express');
 const parkingRoute = require('../routes/parkingRoutes');
 const { connectToDatabase, sequelize } = require('../config/database');
-const { getToken } = require('../utils/testUtils');
+const { getAuth, createUser } = require('../utils/testUtils');
 
 const app = express();
 app.use(express.json());
 app.use('/api/parking', parkingRoute);
 
-let createdParkingId;
+let adminAuth;
+let partnerUser;
 
 beforeAll(async () => {
     await connectToDatabase();
-    global.token = await getToken();
+    adminAuth = await getAuth(true);
+    partnerUser = await createUser(`partner_${Date.now()}@test.com`, 'password', 'SOCIO');
 });
 
 afterAll(async () => {
@@ -21,62 +23,74 @@ afterAll(async () => {
     }
 });
 
-test('POST Create Parking Space', async () => {
-    const response = await request(app)
-        .post('/api/parking/')
-        .set('Authorization', `Bearer ${global.token}`)
-        .send({
-            name : "parqueadero El jdoe",
-            address: "av 5 #36-23",
-            capacity: 200,
-            id_partner: 2,
-            cost: 25000
+describe('Parking API', () => {
+
+    test('POST Create Parking Space', async () => {
+        const response = await request(app)
+            .post('/api/parking/')
+            .set('Authorization', `Bearer ${adminAuth.token}`)
+            .send({
+                name: "Parqueadero Test Create",
+                address: "av 5 #36-23",
+                capacity: 200,
+                id_partner: partnerUser.id,
+                cost: 25000
+            });
+
+        expect(response.body.result).toBe(true);
+        expect(response.body.data).toHaveProperty('id');
+    });
+
+    test('GET All Parkings', async () => {
+        const response = await request(app)
+            .get('/api/parking/')
+            .set('Authorization', `Bearer ${adminAuth.token}`);
+        expect(response.body.result).toBe(true);
+        expect(Array.isArray(response.body.data)).toBe(true);
+    });
+
+    describe('operations on a single parking space', () => {
+        let testParking;
+
+        beforeEach(async () => {
+            const response = await request(app)
+                .post('/api/parking/')
+                .set('Authorization', `Bearer ${adminAuth.token}`)
+                .send({ name: "Test Parking Instance", address: "123 Main St", capacity: 50, id_partner: partnerUser.id, cost: 15000 });
+            testParking = response.body.data;
         });
 
-    expect(response.body.result).toBe(true);
-    createdParkingId = response.body.data?.id || createdParkingId;
-});
-
-test('GET All Parkings', async () => {
-    const response = await request(app)
-        .get('/api/parking/')
-        .set('Authorization', `Bearer ${global.token}`);
-    expect(response.body.result).toBe(true);
-    expect(Array.isArray(response.body.data)).toBe(true);
-});
-
-test('PUT Update Parking Space', async () => {
-    const idToUpdate = createdParkingId || 2;
-    const response = await request(app)
-        .put(`/api/parking/${idToUpdate}`)
-        .set('Authorization', `Bearer ${global.token}`)
-        .send({
-            name : "Parqueadero Test",
-            address: "av 5 #36-23",
-            capacity: 20,
-            id_partner: 2,
-            cost: 35000
+        test('GET Parking Space by ID', async () => {
+            const response = await request(app)
+                .get(`/api/parking/${testParking.id}`)
+                .set('Authorization', `Bearer ${adminAuth.token}`);
+            expect(response.body.result).toBe(true);
+            expect(response.body.data[0].id).toBe(testParking.id);
         });
 
-    expect(response.body.result).toBe(true);
-    expect(response.body.msg).toBe('Parqueadero actualizado correctamente');
-});
+        test('PUT Update Parking Space', async () => {
+            const response = await request(app)
+                .put(`/api/parking/${testParking.id}`)
+                .set('Authorization', `Bearer ${adminAuth.token}`)
+                .send({
+                    name: "Parqueadero Updated",
+                    address: "av 5 #36-23",
+                    capacity: 25,
+                    id_partner: partnerUser.id,
+                    cost: 40000
+                });
 
-test('DELETE Parking Space', async () => {
-    const idToDelete = createdParkingId || 2;
-    const response = await request(app)
-        .delete(`/api/parking/${idToDelete}`)
-        .set('Authorization', `Bearer ${global.token}`);
+            expect(response.body.result).toBe(true);
+            expect(response.body.msg).toBe('Parqueadero actualizado correctamente');
+        });
 
-    expect(response.body.result).toBe(true);
-    expect(response.body.msg).toBe('Parqueadero eliminado correctamente');
-});
+        test('DELETE Parking Space', async () => {
+            const response = await request(app)
+                .delete(`/api/parking/${testParking.id}`)
+                .set('Authorization', `Bearer ${adminAuth.token}`);
 
-test('GET Parking Space by ID', async () => {
-    const idToGet = createdParkingId || 1;
-    const response = await request(app)
-        .get(`/api/parking/${idToGet}`)
-        .set('Authorization', `Bearer ${global.token}`);
-
-    expect([true, false]).toContain(response.body.result);
+            expect(response.body.result).toBe(true);
+            expect(response.body.msg).toBe('Parqueadero eliminado correctamente');
+        });
+    });
 });

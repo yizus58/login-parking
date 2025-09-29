@@ -1,7 +1,7 @@
 require('dotenv').config();
 const {Op} = require("sequelize");
 const { response } = require('express');
-const { validateUserRole, validatePlate, validateVehiclePlate, responseError, userRoleResponse, validateCapacity } = require('../utils/validation');
+const { validateUserRole, validateVehiclePlate, responseError, userRoleResponse, validateCapacity } = require('../utils/validation');
 const db = require('../config/database');
 const logger = require('../utils/logger');
 const Parking = require('../models/Parking');
@@ -68,7 +68,7 @@ const EntryVehicle = async (req, res = response) => {
             const letters = vehicle_plate.substring(0, 3);
             const numbers = vehicle_plate.substring(3);
 
-            if (/^[A-Z]{3}$/.test(letters) && /^\d{3}$/.test(numbers)) {
+            if (/^[A-Z]{3}$/.test(letters) && /^\d{3,4}$/.test(numbers)) {
                 vehicle_plate = `${letters}-${numbers}`;
             }
         }
@@ -102,17 +102,22 @@ const EntryVehicle = async (req, res = response) => {
 
         const currentTime = new Date();
 
-        const vehicleEntry = new Vehicle(
-            { id_parking, plate_number: vehicle_plate, model_vehicle, entry_time: currentTime, cost_per_hour: cost, id_admin: uid }
-        );
+        const vehicleEntry = await Vehicle.create({
+            id_parking, 
+            plate_number: vehicle_plate, 
+            model_vehicle, 
+            entry_time: currentTime, 
+            cost_per_hour: cost, 
+            id_admin: uid, 
+            status: 'IN'
+        });
 
-        await vehicleEntry.save();
-
-        vehicleEntry.entry_time = new Date(currentTime.getTime() - (5 * 60 * 60 * 1000));
+        const responseData = vehicleEntry.toJSON();
+        responseData.entry_time = new Date(currentTime.getTime() - (5 * 60 * 60 * 1000));
 
         res.status(201).json({
             result: true,
-            data: vehicleEntry
+            data: responseData
         });
     } catch (error) {
         logger.error(error);
@@ -143,12 +148,14 @@ const ExitVehicle = async (req, res = response) => {
             });
         }
 
-        const verifyPlate = await validatePlate(id_parking, vehicle_plate)
-        if (!verifyPlate) {
-            return res.status(404).json({
-                result: false,
-                msg: 'No se puede Registrar Salida, no existe la placa en el parqueadero'
-            });
+        // Apply the same plate formatting logic as in EntryVehicle
+        if (vehicle_plate.length !== 7) {
+            const letters = vehicle_plate.substring(0, 3);
+            const numbers = vehicle_plate.substring(3);
+
+            if (/^[A-Z]{3}$/.test(letters) && /^\d{3,4}$/.test(numbers)) {
+                vehicle_plate = `${letters}-${numbers}`;
+            }
         }
 
         const vehicleEntry = await Vehicle.findOne({
@@ -179,21 +186,20 @@ const ExitVehicle = async (req, res = response) => {
         const hoursParked = Math.ceil(minutesParked / 60);
         const totalCost = hoursParked * costParking;
 
-        vehicleEntry.exit_time = exitTime;
         await Vehicle.update(
             { exit_time: currentTime, status: 'OUT' },
-            { where: { id_parking, plate_number: vehicle_plate } }
+            { where: { id: vehicleEntry.id } }
         );
 
-        const { id_admin, ...vehicleWithOutIds } = vehicleEntry.toJSON();
-        delete vehicleWithOutIds.id_parking;
-
-        vehicleWithOutIds.entry_time = entryTime;
-        vehicleWithOutIds.total_cost = totalCost;
+        const responseData = vehicleEntry.toJSON();
+        responseData.exit_time = exitTime;
+        responseData.total_cost = totalCost;
+        responseData.status = 'OUT';
+        delete responseData.id_parking;
 
         res.status(200).json({
             result: true,
-            data: vehicleWithOutIds,
+            data: responseData,
             msg: 'Salida registrada',
         });
     } catch (error) {
@@ -354,7 +360,7 @@ const getTopVehiclesByParking = async (req, res = response) => {
 };
 
 const getEarningsByPeriod = async (req, res = response) => {
-    const { id_parking, start_date, end_date } = req.body;
+    const { id_parking, start_date, end_date } = req.query;
     const uid = req.uid;
 
     try {
@@ -363,11 +369,11 @@ const getEarningsByPeriod = async (req, res = response) => {
             return userRoleResponse(validateUser, res);
         }
 
-        const parking = await Parking.findByPk(id_parking);
+        const parking = await Parking.findOne({ where: { id: id_parking, id_partner: uid } });
         if (!parking) {
             return res.status(404).json({
                 result: false,
-                msg: 'Parqueadero no encontrado'
+                msg: 'Parqueadero no encontrado o no le pertenece al usuario'
             });
         }
 
@@ -457,7 +463,7 @@ const getEarningsByPeriod = async (req, res = response) => {
         logger.error(error);
         return res.status(500).json({
             result: false,
-            msg: 'Ha ocurrido un error, por favor comuníquese con el equipo de soporte'
+            msg: 'Oops, a ocurrido un error, por favor comuniquese con el equipo de soporte'
         });
     }
 };
@@ -570,7 +576,7 @@ const getVehiclesOutDetails = async () => {
             {
                 model: User,
                 as: 'admin',
-                attributes: ['id', 'username', 'email'] // <= antes 'user_name'
+                attributes: ['id', 'username', 'email']
             }
         ],
         where: {
@@ -608,7 +614,7 @@ const getVehiclesOutDetails = async () => {
         if (!parkingEarnings[userId]) {
             parkingEarnings[userId] = {
                 id: userId,
-                username: vehicle.admin?.username, // <= antes user_name
+                username: vehicle.admin?.username,
                 email: vehicle.admin?.email,
             }
         }
@@ -706,7 +712,6 @@ const VehiclesOutDetails = async () => {
         });
     });
 
-    // Sort by total earnings (highest first)
     flattenedData.sort((a, b) => b.total_earnings - a.total_earnings);
 
     return flattenedData;

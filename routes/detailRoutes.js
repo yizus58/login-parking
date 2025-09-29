@@ -8,7 +8,7 @@ const { generateExcel, removeExcelS3 } = require("../controllers/reportExcel");
 const router = Router();
 
 router.get('/:id', ...validateIdParams, validateJWT, getDetailParking);
-router.get('/', ...validateEarningPeriod, getEarningsByPeriod);
+router.get('/', ...validateEarningPeriod, validateJWT, getEarningsByPeriod);
 router.get('/:id/excel', ...validateIdParams, validateJWT, generateExcel);
 router.delete('/excel', validateJWT, removeExcelS3);
 

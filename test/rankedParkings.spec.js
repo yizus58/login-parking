@@ -2,21 +2,29 @@ const request = require('supertest');
 const express = require('express');
 const rankedParkingRoute = require('../routes/rankedParkingsRoutes');
 const { connectToDatabase, sequelize } = require('../config/database');
-const { getToken } = require('../utils/testUtils');
+const { getAuth } = require('../utils/testUtils');
 
 const app = express();
 app.use(express.json());
 app.use('/api/ranked-parkings', rankedParkingRoute);
 
+let auth;
+
 beforeAll(async () => {
     await connectToDatabase();
-    global.token = await getToken();
+    auth = await getAuth(true);
+});
+
+afterAll(async () => {
+    if (sequelize && sequelize.close) {
+        await sequelize.close();
+    }
 });
 
 test('GET Get Ranked Parking Space', async () => {
     const response = await request(app)
         .get('/api/ranked-parkings/')
-        .set('Authorization', `Bearer ${global.token}`);
+        .set('Authorization', `Bearer ${auth.token}`);
 
     expect(response.body.result).toBe(true);
     expect(response.body).toHaveProperty('data');

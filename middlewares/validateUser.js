@@ -5,6 +5,7 @@ const validateUserNew = [
     check('username','El username es obligatorio').not().isEmpty(),
     check('password','El password es obligatorio').not().isEmpty(),
     check('email','El email es obligatorio').isEmail(),
+    check('role', 'El rol es inválido').optional().isIn(['SOCIO', 'ADMIN']),
     validate
 ];
 

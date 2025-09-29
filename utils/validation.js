@@ -150,45 +150,27 @@ const validateVehiclePlate = (plateNumber) => {
 
 const validatePlate = async (id_parking, plate_number) => {
     const cleanPlate = plate_number.replace(/\s+/g, '').toUpperCase();
-    let newPlate = '';
 
-    const findVehicleIn = await Vehicle.findOne({
-        where: {
-            id_parking,
-            plate_number: cleanPlate,
-            status: 'IN'
-        }
+    let vehicle = await Vehicle.findOne({
+        where: { id_parking, plate_number: cleanPlate, status: 'IN' }
     });
 
-    if (!findVehicleIn) {
-        if (cleanPlate.includes('-')) {
-            return false;
-        }
+    if (vehicle) return true;
 
+    if (!cleanPlate.includes('-')) {
         const letters = cleanPlate.substring(0, 3);
         const numbers = cleanPlate.substring(3);
 
-        if (/^[A-Z]{3}$/.test(letters) && /^\d{3}$/.test(numbers)) {
-            newPlate = `${letters}-${numbers}`;
-        }
-
-        if (newPlate.length === 7) {
-
-            const findNewPlate = await Vehicle.findOne({
-                where: {
-                    id_parking,
-                    plate_number: newPlate,
-                    status: 'IN'
-                }
+        if (/^[A-Z]{3}$/.test(letters) && /^\d{3,4}$/.test(numbers)) {
+            const newPlate = `${letters}-${numbers}`;
+            vehicle = await Vehicle.findOne({
+                where: { id_parking, plate_number: newPlate, status: 'IN' }
             });
-
-            if (!findNewPlate) {
-                return false;
-            }
+            if (vehicle) return true;
         }
-        return false;
     }
-    return true;
+
+    return false;
 };
 
 const responseError = (error, res = response) => {

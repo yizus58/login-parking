@@ -4,7 +4,7 @@ const { response } = require('express');
 const { validateUserRole, validateExistingUser, validateUserByEmailExists, validatePassword, userRoleResponse} = require('../utils/validation');
 const bcrypt = require('bcryptjs');
 const logger = require('../utils/logger');
-const User = require('../models/user');
+const User = require('../models/User');
 const idAdmin = Number(process.env.ID_ADMIN);
 
 async function ensureAdminSeed() {
@@ -133,12 +133,7 @@ const getAllUsers = async (req, res = response) => {
         const users = await User.findAll();
 
         const usersFilter = users.filter(user => user.role === 'SOCIO');
-        if (usersFilter.length === 0) {
-            return res.json({
-                result: false,
-                msg: 'No hay usuarios registrados, por favor registre un usuario'
-            });
-        }
+        
         const usersWithoutPassword = usersFilter.map(user => {
             const { password, ...rest } = user.toJSON();
             return rest;
@@ -150,7 +145,7 @@ const getAllUsers = async (req, res = response) => {
         });
     } catch (error) {
         logger.error(error);
-        res.status(500).json({
+        return res.status(500).json({
             result: false,
             msg: 'Oops, a ocurrido un error, por favor comuniquese con el equipo de soporte'
         });
