@@ -25,41 +25,32 @@ async function getAuth(admin = true) {
 }
 
 const createUser = async (mail, pass, rol = 'ADMIN') => {
-    await User.sequelize.sync();
 
-    return User.sequelize.transaction(async (t) => {
-        const salt = await bcrypt.genSalt();
-        const hashedPassword = await bcrypt.hash(pass, salt);
+    const salt = await bcrypt.genSalt();
+    const hashedPassword = await bcrypt.hash(pass, salt);
+    
+    const where = rol === 'ADMIN' ? { username: 'admin' } : { email: mail };
+    const defaults = {
+        username: rol === 'ADMIN' ? 'admin' : `jdoe_${Date.now()}`,
+        email: mail,
+        password: hashedPassword,
+        role: rol
+    };
 
-        const where = rol === 'ADMIN' ? { username: 'admin' } : { email: mail };
-        const defaults = {
-            username: rol === 'ADMIN' ? 'admin' : `jdoe_${Date.now()}`,
-            email: mail,
-            password: hashedPassword,
-            role: rol
-        };
+    const [user, created] = await User.findOrCreate({ where, defaults });
 
-        const [user, created] = await User.findOrCreate({
-            where,
-            defaults,
-            transaction: t
-        });
+    if (!created) {
+        user.password = hashedPassword;
+        user.role = rol;
+        user.email = mail;
+        await user.save();
+    }
 
-        if (!created) {
-            await User.update(
-                { password: hashedPassword, role: rol, email: mail },
-                { where: { id: user.id }, transaction: t }
-            );
-        }
-        
-        await user.reload({ transaction: t });
-        return user;
-    });
+    await user.reload();
+    return user;
 };
 
-
 const createParking = async (partnerId) => {
-    await Parking.sequelize.sync();
     const parking = await Parking.create({
         name: `Test Parking ${Date.now()}`,
         address: "123 Test St",

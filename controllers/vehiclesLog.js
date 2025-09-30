@@ -148,7 +148,6 @@ const ExitVehicle = async (req, res = response) => {
             });
         }
 
-        // Apply the same plate formatting logic as in EntryVehicle
         if (vehicle_plate.length !== 7) {
             const letters = vehicle_plate.substring(0, 3);
             const numbers = vehicle_plate.substring(3);
