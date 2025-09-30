@@ -19,8 +19,6 @@ const sequelize = new Sequelize(dbName, DB_USER, DB_PASSWORD, {
     logging: false,
 });
 
-require('../models/associations');
-
 const createDbIfNotExists = async () => {
     const client = new pg.Client({ user: DB_USER, password: DB_PASSWORD, host: DB_HOST, database: 'postgres' });
     try {
@@ -50,6 +48,7 @@ const setupTestDatabase = async () => {
     global.dbSetupPromise = (async () => {
         try {
             await createDbIfNotExists();
+            require('../models/associations');
             await sequelize.sync({ force: true });
             logger.info('Database synchronized successfully by a single test worker.');
         } catch (error) {
