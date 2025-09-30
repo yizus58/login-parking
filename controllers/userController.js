@@ -15,7 +15,6 @@ const createUser = async (req, res = response) => {
             return userRoleResponse(validateUser, res);
         }
 
-        // Perform validation within the controller to ensure DB is connected
         const emailExists = await User.findOne({ where: { email } });
         if (emailExists) {
             return res.status(400).json({ result: false, msg: 'El correo ya se encuentra registrado, por favor ingrese otro' });
@@ -76,7 +75,80 @@ const getAllUsers = async (req, res = response) => {
     }
 }
 
+const getAllUsersWithAdmin = async (req, res = response) => {
+    try {
+        const uid = req.uid;
+
+        const validateUser = await validateUserRole(uid);
+        if (validateUser !== 1) {
+            return userRoleResponse(validateUser, res);
+        }
+
+        const users = await User.findAll();
+
+        const usersWithoutPassword = users.map(user => {
+            const { password, ...rest } = user.toJSON();
+            return rest;
+        })
+
+        res.json({
+            result: true,
+            data: usersWithoutPassword
+        });
+    } catch (error) {
+        logger.error(error);
+        return res.status(500).json({
+            result: false,
+            msg: 'Oops, a ocurrido un error, por favor comuniquese con el equipo de soporte'
+        });
+    }
+}
+
+const updateUser = async (req, res = response) => {
+    const { id } = req.params;
+    const { body } = req;
+    const uid = req.uid;
+
+    try {
+        const validateUser = await validateUserRole(uid);
+        if (validateUser !== 1) {
+            return userRoleResponse(validateUser, res);
+        }
+
+        const user = await User.findByPk(id);
+        if (!user) {
+            return res.status(404).json({
+                result: false,
+                msg: `No se encontró un usuario con el id ${id}`
+            });
+        }
+
+        if (body.password) {
+            const salt = bcrypt.genSaltSync();
+            body.password = bcrypt.hashSync(body.password, salt);
+        }
+
+        await user.update(body);
+
+        const { password, ...userResponse } = user.toJSON();
+
+        res.json({
+            result: true,
+            data: userResponse
+        });
+
+    } catch (error) {
+        logger.error(error);
+        return res.status(500).json({
+            result: false,
+            msg: 'Oops, a ocurrido un error, por favor comuniquese con el equipo de soporte'
+        });
+    }
+}
+
 module.exports = {
     createUser,
-    getAllUsers
+    getAllUsers,
+    getAllUsersWithAdmin,
+    updateUser
 }
