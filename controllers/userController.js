@@ -11,7 +11,7 @@ const createUser = async (req, res = response) => {
 
     try {
         const validateUser = await validateUserRole(uid);
-        if (validateUser !== 1) { // 1 is ADMIN
+        if (validateUser !== 1) {
             return userRoleResponse(validateUser, res);
         }
 
@@ -52,7 +52,7 @@ const getAllUsers = async (req, res = response) => {
         const uid = req.uid;
 
         const validateUser = await validateUserRole(uid);
-        if (validateUser !== 1) { // 1 is ADMIN
+        if (validateUser !== 1) {
             return userRoleResponse(validateUser, res);
         }
 
