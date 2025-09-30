@@ -1,3 +1,4 @@
+require('../models/associations');
 const request = require('supertest');
 const authRoutes = require('../routes/authRoutes');
 const express = require("express");

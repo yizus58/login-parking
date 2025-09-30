@@ -9,7 +9,7 @@ dotenv.config();
 
 const { DB_NAME_TEST, DB_USER, DB_PASSWORD, DB_HOST, NODE_ENV } = process.env;
 
-const dbName = NODE_ENV === 'test' ? DB_NAME_TEST : process.env.DB_NAME;
+const dbName = NODE_ENV === 'test' ? `${process.env.DB_NAME_TEST}_${process.env.JEST_WORKER_ID || '1'}` : process.env.DB_NAME;
 
 const sequelize = new Sequelize(dbName, DB_USER, DB_PASSWORD, {
     host: DB_HOST,
@@ -48,7 +48,6 @@ const setupTestDatabase = async () => {
         try {
             logger.info('DB lock acquired. Syncing database...');
             await createDbIfNotExists();
-            require('../models/associations');
             await sequelize.sync({ force: true });
             logger.info('Database sync complete.');
         } finally {
