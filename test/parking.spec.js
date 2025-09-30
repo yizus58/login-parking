@@ -1,20 +1,18 @@
 const request = require('supertest');
-const express = require('express');
-const parkingRoute = require('../routes/parkingRoutes');
+const Server = require('../models/server');
 const { connectToDatabase, sequelize } = require('../config/database');
 const { getAuth, createUser } = require('../utils/testUtils');
 
-const app = express();
-app.use(express.json());
-app.use('/api/parking', parkingRoute);
+const server = new Server();
+const app = server.app;
 
 let adminAuth;
 let partnerUser;
 
 beforeAll(async () => {
     await connectToDatabase();
-    adminAuth = await getAuth(true);
-    partnerUser = await createUser(`partner_${Date.now()}@test.com`, 'password', 'SOCIO');
+    adminAuth = await getAuth(true, app);
+    partnerUser = await createUser(app,`partner_${Date.now()}@test.com`, 'password', 'SOCIO');
 });
 
 afterAll(async () => {

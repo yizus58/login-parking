@@ -1,12 +1,10 @@
 const request = require('supertest');
-const express = require('express');
-const authRoutes = require('../routes/authRoutes');
+const Server = require('../models/server');
 const { connectToDatabase, sequelize} = require('../config/database');
 const { getAuth } = require("../utils/testUtils");
 
-const app = express();
-app.use(express.json());
-app.use('/api/auth', authRoutes);
+const server = new Server();
+const app = server.app;
 
 beforeAll(async () => {
     await connectToDatabase();
@@ -22,7 +20,7 @@ describe('Auth API', () => {
     let auth;
 
     beforeAll(async () => {
-        auth = await getAuth(true);
+        auth = await getAuth(true, app);
     });
 
     test('POST /login with correct credentials', async () => {

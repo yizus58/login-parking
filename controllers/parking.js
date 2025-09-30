@@ -6,7 +6,6 @@ const Parking = require('../models/Parking');
 const User = require('../models/User');
 const Vehicle = require('../models/Vehicle');
 require('../models/associations');
-const idAdmin = Number(process.env.ID_ADMIN);
 
 const createParking = async (req, res = response) => {
     const {name, address, capacity, cost, id_partner} = req.body;
@@ -15,7 +14,7 @@ const createParking = async (req, res = response) => {
 
     try {
         const validateUser = await validateUserRole(uid);
-        if (validateUser !== idAdmin) return userRoleResponse(validateUser, res);
+        if (validateUser !== 1) return userRoleResponse(validateUser, res);
 
         const findUser = await User.findByPk(id_partner);
         if (!findUser) {
@@ -61,7 +60,7 @@ const updateParking = async (req, res = response) => {
 
     try {
         const validateUser = await validateUserRole(uid);
-        if (validateUser !== idAdmin) return userRoleResponse(validateUser, res);
+        if (validateUser !== 1) return userRoleResponse(validateUser, res);
 
         const parking = await Parking.findByPk(id);
         if (!parking) {
@@ -100,7 +99,7 @@ const getAllParkings = async (req, res = response) => {
 
     try {
         const validateUser = await validateUserRole(uid);
-        if (validateUser !== idAdmin) {
+        if (validateUser !== 1) {
             return userRoleResponse(validateUser, res);
         }
 
@@ -143,7 +142,7 @@ const getParkingById = async (req, res = response) => {
 
     try {
         const validateUser = await validateUserRole(uid);
-        if (validateUser !== idAdmin) {
+        if (validateUser !== 1) {
             return getParkingByUser(req, res);
         }
 
@@ -227,7 +226,7 @@ const getDetailParking = async (req, res = response) => {
 
     try {
         const validateUser = await validateUserRole(uid);
-        if (validateUser === idAdmin) {
+        if (validateUser === 1) {
             return userRoleResponse(validateUser, res);
         }
 
@@ -271,7 +270,7 @@ const removeParking = async (req, res = response) => {
 
     try {
         const validateUser = await validateUserRole(uid);
-        if (validateUser !== idAdmin) {
+        if (validateUser !== 1) {
             return userRoleResponse(validateUser, res);
         }
 

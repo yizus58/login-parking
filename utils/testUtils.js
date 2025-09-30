@@ -1,21 +1,15 @@
 require('../models/associations');
 const request = require('supertest');
-const authRoutes = require('../routes/authRoutes');
-const express = require("express");
 const User = require('../models/User');
 const Parking = require('../models/Parking');
 const bcrypt = require('bcryptjs');
 
-const app = express();
-app.use(express.json());
-app.use('/api/auth', authRoutes);
-
-async function getAuth(admin = true) {
+async function getAuth(admin = true, app) {
     const email = admin ? process.env.ADMIN_EMAIL : process.env.TEST_USER_EMAIL;
     const password = admin ? process.env.ADMIN_PASSWORD : process.env.TEST_USER_PASSWORD;
     const role = admin ? 'ADMIN' : 'SOCIO';
 
-    const user = await createUser(email, password, role);
+    const user = await createUser(app, email, password, role);
 
     const response = await request(app)
         .post('/api/auth/login')
@@ -25,7 +19,7 @@ async function getAuth(admin = true) {
     return { token, user };
 }
 
-const createUser = async (mail, pass, rol = 'ADMIN') => {
+const createUser = async (app, mail, pass, rol = 'ADMIN') => {
 
     const salt = await bcrypt.genSalt();
     const hashedPassword = await bcrypt.hash(pass, salt);

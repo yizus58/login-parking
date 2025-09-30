@@ -6,14 +6,14 @@ const router = Router();
 
 
 // routes admin
-router.post('/', ...validateParking, validateJWT,createParking);
-router.put('/:id', ...validateUpdateParking, validateJWT, updateParking);
+router.post('/', validateJWT, ...validateParking, createParking);
+router.put('/:id', validateJWT, ...validateUpdateParking, updateParking);
 
 router.get('/', validateJWT, getAllParkings);
 
-router.delete('/:id', ...validateIdParams, validateJWT, removeParking);
+router.delete('/:id', validateJWT, ...validateIdParams, removeParking);
 
 // routes admin and users
-router.get('/:id', ...validateIdParams, validateJWT, getParkingById);
+router.get('/:id', validateJWT, ...validateIdParams, getParkingById);
 
 module.exports = router;
