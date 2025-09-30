@@ -1,11 +1,10 @@
 require('dotenv').config();
 const { generateJWT } = require('../helpers/jwt');
 const { response } = require('express');
-const { validateUserRole, validateExistingUser, validateUserByEmailExists, validatePassword, userRoleResponse} = require('../utils/validation');
+const { validateUserByEmailExists, validatePassword } = require('../utils/validation');
 const bcrypt = require('bcryptjs');
 const logger = require('../utils/logger');
 const User = require('../models/User');
-const idAdmin = Number(process.env.ID_ADMIN);
 
 async function ensureAdminSeed() {
     try {
@@ -31,43 +30,6 @@ if (process.env.NODE_ENV !== 'test') {
     User.sequelize.sync().then(() => ensureAdminSeed());
 }
 
-
-const createUser = async (req, res = response) => {
-    const {email, password, username} = req.body;
-
-    const uid = req.uid;
-
-    try {
-        const validateUser = await validateUserRole(uid);
-        if (validateUser !== idAdmin) {
-            return userRoleResponse(validateUser, res);
-        }
-
-        const validateExistUser = await validateExistingUser(email, username, res);
-        if (validateExistUser) return validateExistUser;
-
-        const user = new User(req.body);
-
-        const salt = bcrypt.genSaltSync();
-        user.password = bcrypt.hashSync(password, salt);
-
-        await user.save();
-
-        delete user.password;
-
-        res.status(201).json({
-            result: true,
-            data: user
-        });
-    } catch (error) {
-        logger.error(error);
-        return res.status(500).json({
-            result: false,
-            msg: 'Oops, a ocurrido un error, por favor comuniquese con el equipo de soporte'
-        });
-    }
-}
-
 const login = async (req, res = response) => {
     const { email, password } = req.body;
 
@@ -90,11 +52,11 @@ const login = async (req, res = response) => {
 
         const token = await generateJWT(user.id);
 
-        delete user.password;
+        const { password: userPassword, ...userResponse } = user.toJSON();
 
         res.json({
             result: true,
-            data: user,
+            data: userResponse,
             token
         });
 
@@ -114,48 +76,17 @@ const renewToken = async (req, res = response) => {
 
     const user = await User.findByPk(uid);
 
+    const { password, ...userResponse } = user.toJSON();
+
     res.json({
         result: true,
-        data: user,
+        data: userResponse,
         token
     });
 }
 
-const getAllUsers = async (req, res = response) => {
-    try {
-        const uid = req.uid;
-
-        const validateUser = await validateUserRole(uid);
-        if (validateUser !== idAdmin) {
-            return userRoleResponse(validateUser, res);
-        }
-
-        const users = await User.findAll();
-
-        const usersFilter = users.filter(user => user.role === 'SOCIO');
-        
-        const usersWithoutPassword = usersFilter.map(user => {
-            const { password, ...rest } = user.toJSON();
-            return rest;
-        })
-
-        res.json({
-            result: true,
-            data: usersWithoutPassword
-        });
-    } catch (error) {
-        logger.error(error);
-        return res.status(500).json({
-            result: false,
-            msg: 'Oops, a ocurrido un error, por favor comuniquese con el equipo de soporte'
-        });
-    }
-}
-
 module.exports = {
-    createUser,
     login,
     renewToken,
-    getAllUsers,
     ensureAdminSeed
 }

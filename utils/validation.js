@@ -4,25 +4,6 @@ const Parking = require('../models/Parking');
 const User = require('../models/User');
 const Vehicle = require('../models/Vehicle');
 
-const validateExistingUser = async (email, username, res = response) => {
-    const emailExist = await User.findOne({ where: { email } });
-    if (emailExist) {
-        return res.status(409).json({
-            result: false,
-            msg: 'El correo ya se encuentra registrado, por favor ingrese otro'
-        });
-    }
-
-    const usernameExist = await User.findOne({ where: { username } });
-    if (usernameExist) {
-        return res.status(409).json({
-            result: false,
-            msg: 'El usuario ya se encuentra registrado, por favor ingrese otro'
-        });
-    }
-    return 0;
-}
-
 const validateCapacity = async (parking, capacity, res = response) => {
     const parkingId = parking.id;
 
@@ -199,7 +180,6 @@ module.exports = {
     userRoleResponse,
     validateCapacity,
     validateCostCapacity,
-    validateExistingUser,
     validateUserByEmailExists,
     validatePassword,
     validateUserRole,
