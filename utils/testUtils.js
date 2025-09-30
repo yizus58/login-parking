@@ -17,7 +17,7 @@ async function getAuth(admin = true) {
     const user = await createUser(email, password, role);
 
     const response = await request(app)
-        .post('/api/auth/')
+        .post('/api/auth/login')
         .send({ email, password });
     const token = response.body.token;
 

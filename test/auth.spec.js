@@ -32,7 +32,7 @@ describe('Auth API', () => {
         };
 
         const response = await request(app)
-            .post('/api/auth/')
+            .post('/api/auth/login')
             .send(user)
             .expect(200);
 
@@ -48,7 +48,7 @@ describe('Auth API', () => {
         };
 
         const response = await request(app)
-            .post('/api/auth/')
+            .post('/api/auth/login')
             .send(user)
             .expect(404);
 
