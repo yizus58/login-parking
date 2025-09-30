@@ -7,26 +7,52 @@ const path = require('path');
 
 dotenv.config();
 
-const { DB_NAME_TEST, DB_USER, DB_PASSWORD, DB_HOST, NODE_ENV } = process.env;
+const { DB_NAME_TEST, DB_USER, DB_PASSWORD, DB_HOST, NODE_ENV, DATABASE_URL } = process.env;
 
-const dbName = NODE_ENV === 'test'
-    ? `${DB_NAME_TEST}_${process.env.JEST_WORKER_ID || '1'}` 
-    : process.env.DB_NAME;
+let sequelize;
+let dbName;
 
-const sequelize = new Sequelize(dbName, DB_USER, DB_PASSWORD, {
-    host: DB_HOST,
-    dialect: 'postgres',
-    logging: false,
-});
+if (DATABASE_URL) {
+    sequelize = new Sequelize(DATABASE_URL, {
+        dialect: 'postgres',
+        logging: false,
+        dialectOptions: {
+            ssl: {
+                require: true,
+                rejectUnauthorized: false
+            }
+        }
+    });
+    try {
+        dbName = new URL(DATABASE_URL).pathname.substring(1);
+    } catch (e) {
+        logger.error("Could not parse DATABASE_URL to find database name.");
+    }
+} else {
+    dbName = NODE_ENV === 'test'
+        ? `${DB_NAME_TEST}_${process.env.JEST_WORKER_ID || '1'}`
+        : process.env.DB_NAME;
+
+    sequelize = new Sequelize(dbName, DB_USER, DB_PASSWORD, {
+        host: DB_HOST,
+        dialect: 'postgres',
+        logging: false,
+    });
+}
 
 const createDbIfNotExists = async () => {
+    if (DATABASE_URL) {
+        logger.info('Skipping database creation check in production-like environment.');
+        return;
+    }
+
     const client = new pg.Client({ user: DB_USER, password: DB_PASSWORD, host: DB_HOST, database: 'postgres' });
     try {
         await client.connect();
         const result = await client.query('SELECT 1 FROM pg_database WHERE datname = $1', [dbName]);
         if (result.rows.length === 0) {
-            await client.query(`CREATE DATABASE "${dbName}"`);
-            logger.info(`Database "${dbName}" created.`);
+            await client.query(`CREATE DATABASE \"${dbName}\"`);
+            logger.info(`Database \"${dbName}\" created.`);
         }
     } catch (error) {
         if (error.code !== '42P04') {
@@ -81,7 +107,7 @@ const connectToDatabase = async () => {
         }
         const models = sequelize.models;
         if (models && Object.keys(models).length > 0) {
-            const tableNames = Object.values(models).map(model => `"${model.tableName}"`).join(', ');
+            const tableNames = Object.values(models).map(model => `\"${model.tableName}\"`).join(', ');
             if (tableNames) {
                 await sequelize.query(`TRUNCATE ${tableNames} RESTART IDENTITY CASCADE;`);
             }
