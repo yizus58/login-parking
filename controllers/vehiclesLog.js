@@ -730,13 +730,15 @@ const getTopPartnersCurrentWeek = async (req, res = response) => {
         const topPartners = await User.findAll({
             attributes: [
                 ['username', 'partner_name'],
-                [sequelize.fn('COUNT', sequelize.col('Parkings.Vehicles.id')), 'vehicle_count']
+                [sequelize.fn('COUNT', sequelize.col('Parkings.vehicles.id')), 'vehicle_count']
             ],
             include: [{
                 model: Parking,
+                as: 'Parkings',
                 attributes: [],
                 include: [{
                     model: Vehicle,
+                    as: 'vehicles',
                     attributes: [],
                     where: {
                         entry_time: {
