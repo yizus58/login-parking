@@ -49,8 +49,15 @@ const setupTestDatabase = async () => {
         try {
             await createDbIfNotExists();
             require('../models/associations');
-            await sequelize.sync({ force: true });
-            logger.info('Database synchronized successfully by a single test worker.');
+            
+            await sequelize.sync();
+
+            const tableNames = Object.values(sequelize.models).map(model => `"${model.tableName}"`).join(', ');
+            if (tableNames) {
+                await sequelize.query(`TRUNCATE ${tableNames} RESTART IDENTITY CASCADE;`);
+            }
+
+            logger.info('Database synchronized and cleaned for test run.');
         } catch (error) {
             logger.error('Error during test database setup:', error);
             throw error;
