@@ -1,18 +1,16 @@
 const request = require('supertest');
-const express = require('express');
-const rankedVehiclesRoute = require('../routes/rankedVehicleRoutes');
+const Server = require('../models/server');
 const { connectToDatabase, sequelize } = require('../config/database');
 const { getAuth } = require('../utils/testUtils');
 
-const app = express();
-app.use(express.json());
-app.use('/api/ranked-vehicles', rankedVehiclesRoute);
+const server = new Server();
+const app = server.app;
 
 let auth;
 
 beforeAll(async () => {
     await connectToDatabase();
-    auth = await getAuth(true);
+    auth = await getAuth(true, app);
 });
 
 afterAll(async () => {

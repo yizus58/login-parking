@@ -20,7 +20,7 @@ describe('Auth API', () => {
     let auth;
 
     beforeAll(async () => {
-        auth = await getAuth(true, app);
+        auth = await getAuth(app, true);
     });
 
     test('POST /login with correct credentials', async () => {

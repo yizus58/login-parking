@@ -11,7 +11,7 @@ let partnerUser;
 
 beforeAll(async () => {
     await connectToDatabase();
-    adminAuth = await getAuth(true, app);
+    adminAuth = await getAuth(app, true);
     partnerUser = await createUser(app,`partner_${Date.now()}@test.com`, 'password', 'SOCIO');
 });
 
