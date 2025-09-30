@@ -9,17 +9,15 @@ dotenv.config();
 
 const { DB_NAME_TEST, DB_USER, DB_PASSWORD, DB_HOST, NODE_ENV } = process.env;
 
-const dbName = NODE_ENV === 'test' ? `${process.env.DB_NAME_TEST}_${process.env.JEST_WORKER_ID || '1'}` : process.env.DB_NAME;
+const dbName = NODE_ENV === 'test'
+    ? `${DB_NAME_TEST}_${process.env.JEST_WORKER_ID || '1'}` 
+    : process.env.DB_NAME;
 
 const sequelize = new Sequelize(dbName, DB_USER, DB_PASSWORD, {
     host: DB_HOST,
     dialect: 'postgres',
     logging: false,
 });
-
-if (typeof global.dbSetupCompleted === 'undefined') {
-    global.dbSetupCompleted = false;
-}
 
 const createDbIfNotExists = async () => {
     const client = new pg.Client({ user: DB_USER, password: DB_PASSWORD, host: DB_HOST, database: 'postgres' });
@@ -41,35 +39,34 @@ const createDbIfNotExists = async () => {
 };
 
 const setupTestDatabase = async () => {
-    const lockFile = path.join(__dirname, '..' , 'jest.db.lock');
-    try {
-        fs.writeFileSync(lockFile, 'locked', { flag: 'wx' });
+    const lockFile = path.join(__dirname, '..', 'jest.db.lock');
 
+    while (true) {
         try {
-            logger.info('DB lock acquired. Syncing database...');
-            await createDbIfNotExists();
-            await sequelize.sync({ force: true });
-            logger.info('Database sync complete.');
-        } finally {
-            fs.unlinkSync(lockFile);
-        }
+            fs.writeFileSync(lockFile, 'locked', { flag: 'wx' });
 
-    } catch (err) {
-        if (err.code === 'EEXIST') {
-            logger.info('DB lock held by another worker. Waiting...');
-            const startTime = Date.now();
-            while (fs.existsSync(lockFile)) {
-                if (Date.now() - startTime > 30000) { // 30s timeout
-                    throw new Error('Timeout waiting for DB lock to be released.');
-                }
-                await new Promise(res => setTimeout(res, 250));
+            logger.info(`DB lock acquired by worker ${process.env.JEST_WORKER_ID || '1'}.`);
+            try {
+                await createDbIfNotExists();
+                require('../models/associations');
+                await sequelize.sync({ force: true });
+                logger.info(`Database sync complete for worker ${process.env.JEST_WORKER_ID || '1'}.`);
+            } finally {
+                fs.unlinkSync(lockFile);
             }
-            logger.info('DB lock released. Proceeding.');
-        } else {
-            throw err;
+            return;
+
+        } catch (err) {
+            if (err.code === 'EEXIST') {
+                await new Promise(resolve => setTimeout(resolve, 200));
+            } else {
+                throw err;
+            }
         }
     }
 };
+
+let dbSetupCompleted = false;
 
 const connectToDatabase = async () => {
     if (NODE_ENV !== 'test') {
@@ -78,14 +75,13 @@ const connectToDatabase = async () => {
     }
 
     try {
-        if (!global.dbSetupCompleted) {
+        if (!dbSetupCompleted) {
             await setupTestDatabase();
-            global.dbSetupCompleted = true;
+            dbSetupCompleted = true;
         }
-
         const models = sequelize.models;
         if (models && Object.keys(models).length > 0) {
-            const tableNames = Object.values(models).map(model => `\"${model.tableName}\"`).join(', ');
+            const tableNames = Object.values(models).map(model => `"${model.tableName}"`).join(', ');
             if (tableNames) {
                 await sequelize.query(`TRUNCATE ${tableNames} RESTART IDENTITY CASCADE;`);
             }
