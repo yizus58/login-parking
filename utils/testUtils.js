@@ -46,14 +46,13 @@ const createUser = async (app, mail, pass, rol = 'ADMIN') => {
 };
 
 const createParking = async (partnerId) => {
-    const parking = await Parking.create({
+    return await Parking.create({
         name: `Test Parking ${Date.now()}`,
         address: "123 Test St",
         capacity: 100,
         cost_per_hour: 10,
         id_partner: partnerId
     });
-    return parking;
 }
 
 module.exports = { getAuth, createUser, createParking };
