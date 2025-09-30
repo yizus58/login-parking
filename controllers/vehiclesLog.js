@@ -10,7 +10,6 @@ const Vehicle = require('../models/Vehicle');
 require('../models/associations');
 
 const idAdmin = 1;
-const idError = 3;
 
 function formateaFecha(date, onlyTime = false) {
     const d = new Date(date);
@@ -216,7 +215,7 @@ const getTopVehicles = async (req, res = response) => {
 
     try {
         const validateUser = await validateUserRole(uid);
-        if (validateUser === idError) {
+        if (validateUser !== idAdmin) {
             return userRoleResponse(validateUser, res);
         }
 
@@ -296,7 +295,7 @@ const getTopVehiclesByParking = async (req, res = response) => {
 
     try {
         const validateUser = await validateUserRole(uid);
-        if (validateUser === idError) {
+        if (validateUser !== idAdmin) {
             return userRoleResponse(validateUser, res);
         }
 
@@ -728,33 +727,34 @@ const getTopPartnersCurrentWeek = async (req, res = response) => {
 
         const { startOfWeek, endOfWeek } = getCurrentWeekDates();
 
-        const topPartners = await Vehicle.findAll({
+        const topPartners = await User.findAll({
             attributes: [
-                ['$Parking.partner.username$', 'partner_name'],
-                [sequelize.fn('COUNT', sequelize.col('Vehicle.id')), 'vehicle_count']
+                ['username', 'partner_name'],
+                [sequelize.fn('COUNT', sequelize.col('Parkings.Vehicles.id')), 'vehicle_count']
             ],
             include: [{
                 model: Parking,
                 attributes: [],
                 include: [{
-                    model: User,
-                    as: 'partner',
+                    model: Vehicle,
                     attributes: [],
                     where: {
-                        role: 'SOCIO'
-                    }
-                }]
+                        entry_time: {
+                            [Op.gte]: startOfWeek,
+                            [Op.lte]: endOfWeek
+                        }
+                    },
+                    required: true
+                }],
+                required: true
             }],
             where: {
-                entry_time: {
-                    [Op.gte]: startOfWeek,
-                    [Op.lte]: endOfWeek
-                }
+                role: 'SOCIO'
             },
-            group: ['Parking.id_partner', '$Parking.partner.username$'],
-            order: [[sequelize.fn('COUNT', sequelize.col('Vehicle.id')), 'DESC']],
+            group: ['User.id', 'User.username'],
+            order: [[sequelize.literal('vehicle_count'), 'DESC']],
             limit: 3,
-            raw: true
+            subQuery: false
         });
 
         res.status(200).json({
@@ -762,7 +762,10 @@ const getTopPartnersCurrentWeek = async (req, res = response) => {
             data: {
                 week_start: startOfWeek,
                 week_end: endOfWeek,
-                top_partners: topPartners
+                top_partners: topPartners.map(p => ({
+                    partner_name: p.getDataValue('partner_name'),
+                    vehicle_count: parseInt(p.getDataValue('vehicle_count'), 10)
+                }))
             }
         });
 
