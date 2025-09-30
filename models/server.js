@@ -47,7 +47,7 @@ class Server {
         try {
             await connectToDatabase();
             await ensureAdminSeed();
-            //await RabbitMQService.connect()
+            await RabbitMQService.connect()
             this.app.listen(this.port, () => {
                 console.log(`Server is running on port ${this.port}`);
             });
