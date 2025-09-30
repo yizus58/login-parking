@@ -3,15 +3,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    command: ["npm", "test"]
-    environment:
-      - NODE_ENV=development
-      - DB_HOST=postgres
-      - DB_USER=postgres
-      - DB_PASSWORD=password
-      - DB_NAME=login_parking_dev
-      - PORT=3000
-      - JWT_KEY=${JWT_KEY}
+    command: ["/usr/local/bin/wait-for", "postgres:5432", "--", "npm", "test"]
+    # Load all variables from the .env file
+    env_file: .env
     depends_on:
       postgres:
         condition: service_healthy
@@ -24,10 +18,8 @@ services:
 
   postgres:
     image: postgres:15-alpine
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=login_parking_dev
+    # Load all variables from the .env file
+    env_file: .env
     ports:
       - "5432:5432"
     volumes:
@@ -36,7 +28,7 @@ services:
       - app-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d $DB_NAME_TEST"]
       interval: 10s
       timeout: 5s
       retries: 5
