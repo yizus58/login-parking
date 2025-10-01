@@ -20,10 +20,10 @@ jobs:
     - name: Create .env file
       run: |
         echo "JWT_KEY=${{ secrets.JWT_KEY }}" >> .env
-        echo "ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}" >> .env
-        echo "ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}" >> .env
-        echo "TEST_USER_EMAIL=${{ secrets.TEST_USER_EMAIL }}" >> .env
-        echo "TEST_USER_PASSWORD=${{ secrets.TEST_USER_PASSWORD }}" >> .env
+        echo "ADMIN_EMAIL=admin@mail.com" >> .env
+        echo "ADMIN_PASSWORD=admin123" >> .env
+        echo "TEST_USER_EMAIL=user@test.com" >> .env
+        echo "TEST_USER_PASSWORD=password" >> .env
 
     - name: Run tests with Docker Compose
       run: docker compose -f docker-compose.dev.yml up --build --abort-on-container-exit
