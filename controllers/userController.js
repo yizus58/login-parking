@@ -75,35 +75,6 @@ const getAllUsers = async (req, res = response) => {
     }
 }
 
-const getAllUsersWithAdmin = async (req, res = response) => {
-    try {
-        const uid = req.uid;
-
-        const validateUser = await validateUserRole(uid);
-        if (validateUser !== 1) {
-            return userRoleResponse(validateUser, res);
-        }
-
-        const users = await User.findAll();
-
-        const usersWithoutPassword = users.map(user => {
-            const { password, ...rest } = user.toJSON();
-            return rest;
-        })
-
-        res.json({
-            result: true,
-            data: usersWithoutPassword
-        });
-    } catch (error) {
-        logger.error(error);
-        return res.status(500).json({
-            result: false,
-            msg: 'Oops, a ocurrido un error, por favor comuniquese con el equipo de soporte'
-        });
-    }
-}
-
 const updateUser = async (req, res = response) => {
     const { id } = req.params;
     const { body } = req;
@@ -149,6 +120,5 @@ const updateUser = async (req, res = response) => {
 module.exports = {
     createUser,
     getAllUsers,
-    getAllUsersWithAdmin,
     updateUser
 }
