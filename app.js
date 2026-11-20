@@ -1,10 +1,10 @@
-const { connectToDatabase } = require('./config/database');
+'use strict';
 
-async function startApp() {
-    await connectToDatabase();
-    const Server = require('./models/server');
-    const server = new Server();
-    server.start();
-}
+/** Entry point (Render and Docker run `node app.js`). */
+const { start } = require('./src/server');
 
-startApp().catch(console.error);
+start().catch((error) => {
+    // Configuration and database errors name the variables, never their values.
+    console.error(`Startup failed: ${error.message}`);
+    process.exit(1);
+});
