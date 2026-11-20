@@ -1,48 +1,51 @@
+# Production-like stack. Configuration comes from the shell or a local .env file
+# (docker compose reads it automatically); nothing secret is written here.
 services:
   app:
     build: .
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
     environment:
-      - NODE_ENV=production
-      - DB_HOST=postgres
-      - DB_USER=postgres
-      - DB_PASSWORD=password
-      - DB_NAME=login_parking
-      - PORT=3000
-      - JWT_KEY=${JWT_KEY:?JWT_KEY must be set in .env}
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-login_parking}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      DB_SSL: "false"
+      JWT_KEY: ${JWT_KEY:?Set JWT_KEY (at least 32 characters)}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      APP_TIMEZONE: ${APP_TIMEZONE:-America/Bogota}
+      REPORTS_ENABLED: ${REPORTS_ENABLED:-false}
+      MAIL_TRANSPORT: ${MAIL_TRANSPORT:-rabbitmq}
+      MAIL_API_URL: ${MAIL_API_URL:-}
+      MAIL_API_KEY: ${MAIL_API_KEY:-}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://rabbitmq}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_BUCKET_NAME: ${R2_BUCKET_NAME:-}
+      R2_BUCKET_ACCESS_KEY: ${R2_BUCKET_ACCESS_KEY:-}
+      R2_BUCKET_SECRET_KEY: ${R2_BUCKET_SECRET_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
-    volumes:
-      - .:/app
-      - /app/node_modules
-    networks:
-      - app-network
     restart: unless-stopped
 
   postgres:
-    image: postgres:15-alpine
+    image: postgres:17-alpine
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=login_parking
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-login_parking}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - app-network
-    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
 volumes:
   postgres_data:
-
-networks:
-  app-network:
-    driver: bridge

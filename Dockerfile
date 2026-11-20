@@ -1,27 +1,19 @@
-FROM node:24.6.0-alpine
+FROM node:24-alpine
 
-# Crear directorio de trabajo
+ENV NODE_ENV=production
 WORKDIR /app
 
-# Copiar package.json y package-lock.json
 COPY package*.json ./
+RUN npm ci --omit=dev && npm cache clean --force
 
-# Instalar solo dependencias de producción
-RUN npm ci --only=production
+COPY --chown=node:node app.js ./
+COPY --chown=node:node src ./src
 
-# Copiar el código fuente
-COPY . .
-
-# Crear usuario no root para seguridad
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nodejs -u 1001
-
-# Cambiar ownership de los archivos
-RUN chown -R nodejs:nodejs /app
-USER nodejs
-
-# Exponer el puerto
+# The official image already has the unprivileged "node" user.
+USER node
 EXPOSE 3000
 
-# Comando para iniciar la aplicación
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD wget -qO- "http://127.0.0.1:${PORT:-3000}/health" > /dev/null || exit 1
+
 CMD ["node", "app.js"]

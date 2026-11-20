@@ -1,41 +1,31 @@
+# Runs the whole test suite (unit + e2e) against a throwaway PostgreSQL:
+#   docker compose -f docker-compose.dev.yml up --build --abort-on-container-exit
+# Only local test values; no .env file is needed.
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    command: ["/usr/local/bin/wait-for", "postgres:5432", "--", "npm", "test"]
-    # Load all variables from the .env file
-    env_file: .env
+    command: ["npm", "run", "test:all"]
+    environment:
+      TEST_DB_HOST: postgres
+      TEST_DB_PORT: 5432
+      TEST_DB_USER: postgres
+      TEST_DB_PASSWORD: postgres
+      TEST_DB_NAME: login_parking_test
     depends_on:
       postgres:
         condition: service_healthy
-    volumes:
-      - .:/app
-      - /app/node_modules
-    networks:
-      - app-network
     restart: "no"
 
   postgres:
-    image: postgres:15-alpine
-    # Load all variables from the .env file
-    env_file: .env
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_dev_data:/var/lib/postgresql/data
-    networks:
-      - app-network
-    restart: unless-stopped
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d $DB_NAME_TEST"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
       timeout: 5s
-      retries: 5
-
-volumes:
-  postgres_dev_data:
-
-networks:
-  app-network:
-    driver: bridge
+      retries: 10

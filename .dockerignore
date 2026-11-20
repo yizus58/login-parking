@@ -1,11 +1,15 @@
 node_modules
 npm-debug.log
 .git
+.github
 .gitignore
-README.md
-.nyc_output
+.dockerignore
 coverage
-.env.template
-.env.development
-.env.test
-.env.production
+.nyc_output
+test
+README.md
+docker-compose*.yml
+Dockerfile*
+# Never bake configuration into the image
+.env
+.env.*
